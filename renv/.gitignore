@@ -1,0 +1,8 @@
+# gitignore created by renv
+library/
+local/
+cellar/
+lock/
+python/
+sandbox/
+staging/
