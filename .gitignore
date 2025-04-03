@@ -3,3 +3,6 @@
 .RData
 .Ruserdata
 test.R
+examples/*
+notes.txt
+
