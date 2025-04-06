@@ -3,6 +3,7 @@ library(dplyr)
 library(optparse)
 library(ggplot2)
 
+
 option_list <- list(
   make_option("--n_spat", type = "integer", default = 5,
               help = "Number of spatial locations at each time point"),
@@ -18,6 +19,7 @@ option_list <- list(
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 set.seed(opt$seed)
+
 
 #' Get country bounding box and polygon
 #'
@@ -62,7 +64,7 @@ gen_unif_coords_country <- function(n_spat, sf_country, bounds) {
   lon <- stats::runif(n_spat, bounds["lon_min"], bounds["lon_max"])
 
   data <- tibble::tibble(lat = lat, lon = lon) %>%
-    sf::st_as_sf(coords = c("lon", "lat"), crs = 4326) # Original was sf
+    sf::st_as_sf(coords = c("lon", "lat"), crs = 4326)
 
   data %>%
     sf::st_filter(sf_country, .predicate = sf::st_within)
