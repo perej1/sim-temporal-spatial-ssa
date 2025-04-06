@@ -1041,6 +1041,17 @@
       ],
       "Hash": "d63e904c63deda45f3f9149c7dcf8703"
     },
+    "sftime": {
+      "Package": "sftime",
+      "Version": "0.3.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "methods",
+        "sf"
+      ],
+      "Hash": "627ee68a5187625b8f042a305bbbb2cc"
+    },
     "sp": {
       "Package": "sp",
       "Version": "2.2-0",
