@@ -63,10 +63,8 @@ gen_unif_coords_country <- function(n_spat, sf_country, bounds) {
   lat <- stats::runif(n_spat, bounds["lat_min"], bounds["lat_max"])
   lon <- stats::runif(n_spat, bounds["lon_min"], bounds["lon_max"])
 
-  data <- tibble::tibble(lat = lat, lon = lon) %>%
-    sf::st_as_sf(coords = c("lon", "lat"), crs = 4326)
-
-  data %>%
+  tibble::tibble(lat = lat, lon = lon) %>%
+    sf::st_as_sf(coords = c("lon", "lat"), crs = 4326) %>%
     sf::st_filter(sf_country, .predicate = sf::st_within)
 }
 
@@ -104,6 +102,7 @@ gen_coords <- function(n_spat = 100, gen_style_coords, ...) {
     dplyr::slice(1:n_spat)
 }
 
+# Compute spatial locations
 if (opt$area == "box") {
   coords <- gen_coords(opt$n_spat, gen_unif_coords_box)
 } else if (opt$area %in% c("finland", "italy")) {
@@ -124,6 +123,7 @@ coords <- coords %>%
                 a = rep(1:opt$n_time, each = opt$n_spat)) %>%
   sftime::st_sftime(sf_column_name = "geometry", time_column_name = "time")
 
+# Example plot
 if (opt$area == "box") {
   g <- ggplot() +
     geom_sf(data = coords, aes(color = a)) +
