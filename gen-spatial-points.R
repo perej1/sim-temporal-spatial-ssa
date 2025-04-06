@@ -1,10 +1,23 @@
 library(tmap)
 library(dplyr)
+library(optparse)
+library(ggplot2)
 
-# Global parameters
-n_spat <- 5L
-n_time <- 3L
-country_name <- "italy"
+option_list <- list(
+  make_option("--n_spat", type = "integer", default = 5,
+              help = "Number of spatial locations at each time point"),
+  make_option("--n_time", type = "integer", default = 3,
+              help = "number of time points, indexing starts from 0"),
+  make_option("--area", type = "character", default = "box",
+              help = "map type, must belong to c('italy', 'finland', 'box')"),
+  make_option("--seed", type = "integer", default = 123,
+              help = "Seed for spatial locations"),
+  make_option("--filename", type = "character", default = "example.pdf",
+              help = "File name for the test figure")
+)
+opt_parser <- OptionParser(option_list = option_list)
+opt <- parse_args(opt_parser)
+set.seed(opt$seed)
 
 #' Get country bounding box and polygon
 #'
@@ -19,7 +32,7 @@ get_country <- function(country) {
     name_polygon <- "Italy"
     name_box <- "IT"
   } else {
-    rlang::abort("Invalid country. Country has to be in c('finland', 'italy')")
+    rlang::abort("Invalid country. Country must be in c('finland', 'italy')")
   }
 
   sf_country <- rnaturalearth::ne_countries(returnclass = "sf",
@@ -89,21 +102,37 @@ gen_coords <- function(n_spat = 100, gen_style_coords, ...) {
     dplyr::slice(1:n_spat)
 }
 
+if (opt$area == "box") {
+  coords <- gen_coords(opt$n_spat, gen_unif_coords_box)
+} else if (opt$area %in% c("finland", "italy")) {
+  country <- get_country(opt$area)
+  coords <- gen_coords(opt$n_spat, gen_unif_coords_country, country$sf_country,
+                       country$bounding_box)
+} else {
+  rlang::abort("Invalid area. Area must be in c('finland', 'italy', 'box')")
+}
 
-# Example with a country
-country <- get_country(country_name)
 
-t <- 0:(n_time - 1)
-
-coords <- gen_coords(n_spat, gen_unif_coords_country, country$sf_country,
-                     country$bounding_box) %>%
-  replicate(n_time, ., simplify = FALSE) %>%
+# Compute spatio-temporal locations
+t <- 0:(opt$n_time - 1)
+coords <- coords %>%
+  replicate(opt$n_time, ., simplify = FALSE) %>%
   bind_rows() %>%
-  dplyr::mutate(time = rep(t, each = n_spat), a = seq_len(nrow(.))) %>%
+  dplyr::mutate(time = rep(t, each = opt$n_spat),
+                a = rep(1:opt$n_time, each = opt$n_spat)) %>%
   sftime::st_sftime(sf_column_name = "geometry", time_column_name = "time")
 
-tm_shape(country$sf_country) +
-  tm_polygons() +
-  tm_shape(coords) +
-  tm_facets(by = "time") +
-  tm_bubbles(col = "black", fill = "a", size = 0.5)
+if (opt$area == "box") {
+  g <- ggplot() +
+    geom_sf(data = coords, aes(color = a)) +
+    facet_wrap(vars(time)) +
+    xlim(0, 1) + ylim(0, 1)
+  ggsave(paste0("figures/", opt$filename), g)
+} else {
+  g <- tm_shape(country$sf_country) +
+    tm_polygons() +
+    tm_shape(coords) +
+    tm_facets(by = "time") +
+    tm_bubbles(col = "black", fill = "a", size = 0.5)
+  tmap_save(g, paste0("figures/", opt$filename))
+}
