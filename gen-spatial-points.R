@@ -23,6 +23,24 @@ opt <- parse_args(opt_parser)
 set.seed(opt$seed)
 
 
+#' Compute negative square root of a positive definite matrix
+#'
+#' More precisely, function computes matrix lambda
+#' s.t. sigma^{-1} = lambda %*% lambda.
+#'
+#' @param sigma Double matrix, positive definite matrix.
+#'
+#' @return Double matrix, square root of the matrix.
+sqrtmat_inv <- function(sigma) {
+  eigenval <- eigen(sigma)$values
+  if (any(eigenval <= 0) || any(sigma != t(sigma))) {
+    rlang::abort("`sigma` must be a symmetric positive definite matrix.")
+  }
+  eigenvec <- eigen(sigma)$vectors
+  eigenvec %*% diag(eigenval^(-0.5)) %*% t(eigenvec)
+}
+
+
 #' Get country bounding box and polygon
 #'
 #' @param country Name of the country in lower case
@@ -172,11 +190,21 @@ simulate <- function(i, coords, a) {
   
   # Compute observed field
   observed <- latent %>%
-    as.matrix() %>%
     apply(1, function(x) a %*% matrix(x, ncol = 1)) %>%
     t() %>%
     as_tibble()
   colnames(observed) <- paste0("x", 1:ncol(latent), "m", i)
+  
+  # Compute whitened field
+  mean_p <- colMeans(observed)
+  cov_p <- cov(observed)
+  
+  whitened <- observed %>%
+    sweep(2, mean_p, "-") %>%
+    apply(1, function(x) sqrtmat_inv(cov_p) %*% matrix(x, ncol = 1)) %>%
+    t() %>%
+    as_tibble()
+  colnames(whitened) <- paste0("x", 1:ncol(latent), "m", i)
   
   list(latent = latent, observed = observed)
 }
