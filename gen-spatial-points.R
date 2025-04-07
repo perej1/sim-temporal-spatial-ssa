@@ -102,6 +102,21 @@ gen_coords <- function(n_spat = 100, gen_style_coords, ...) {
     dplyr::slice(1:n_spat)
 }
 
+
+gen_field_smooth_trend <- function(coords, stationary = TRUE, theta1 = 1,
+                                   theta2 = -1, theta3 = 3) {
+  white_noise <- stats::rnorm(nrow(coords), mean = 0, sd = 1)
+  if (stationary) {
+    white_noise
+  } else {
+    do.call(rbind, sf::st_geometry(coords)) %>%
+      tibble::as_tibble() %>%
+      mutate(t = sftime::st_time(coords), e = white_noise) %>%
+      purrr::pmap_dbl(~ theta1 * ..1 + theta2 * ..2 + theta3 * ..3 + ..4)
+  }
+}
+
+
 # Compute spatial locations
 if (opt$area == "box") {
   coords <- gen_coords(opt$n_spat, gen_unif_coords_box)
@@ -113,28 +128,22 @@ if (opt$area == "box") {
   rlang::abort("Invalid area. Area must be in c('finland', 'italy', 'box')")
 }
 
-
-# Compute spatio-temporal locations
+# Add temporal locations
 t <- 0:(opt$n_time - 1)
 coords <- coords %>%
   replicate(opt$n_time, ., simplify = FALSE) %>%
   bind_rows() %>%
-  dplyr::mutate(time = rep(t, each = opt$n_spat),
-                a = rep(1:opt$n_time, each = opt$n_spat)) %>%
+  dplyr::mutate(time = rep(t, each = opt$n_spat)) %>%
   sftime::st_sftime(sf_column_name = "geometry", time_column_name = "time")
 
-# Example plot
-if (opt$area == "box") {
-  g <- ggplot() +
-    geom_sf(data = coords, aes(color = a)) +
-    facet_wrap(vars(time)) +
-    xlim(0, 1) + ylim(0, 1)
-  ggsave(paste0("figures/", opt$filename), g)
-} else {
-  g <- tm_shape(country$sf_country) +
-    tm_polygons() +
-    tm_shape(coords) +
-    tm_facets(by = "time") +
-    tm_bubbles(col = "black", fill = "a", size = 0.5)
-  tmap_save(g, paste0("figures/", opt$filename))
-}
+# Compute latent components
+latent <- coords %>%
+  mutate(s1 = gen_field_smooth_trend(., stationary = TRUE),
+         s2 = gen_field_smooth_trend(., stationary = TRUE),
+         s3 = gen_field_smooth_trend(., stationary = TRUE),
+         s4 = gen_field_smooth_trend(., stationary = TRUE),
+         s5 = gen_field_smooth_trend(., stationary = TRUE),
+         s6 = gen_field_smooth_trend(., stationary = FALSE, 0.5, -2, 3),
+         s7 = gen_field_smooth_trend(., stationary = FALSE, -2, 3, 0.5),
+         s8 = gen_field_smooth_trend(., stationary = FALSE, 3, 0.5, -2)
+  )
