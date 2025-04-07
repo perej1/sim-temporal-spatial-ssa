@@ -9,6 +9,8 @@ option_list <- list(
               help = "Number of spatial locations at each time point"),
   make_option("--n_time", type = "integer", default = 3,
               help = "number of time points, indexing starts from 0"),
+  make_option("--m", type = "integer", default = 2,
+              help = "Number of repetitions per scenario"),
   make_option("--area", type = "character", default = "box",
               help = "map type, must belong to c('italy', 'finland', 'box')"),
   make_option("--seed", type = "integer", default = 123,
@@ -103,6 +105,16 @@ gen_coords <- function(n_spat = 100, gen_style_coords, ...) {
 }
 
 
+#' Generate white noise with possible trend depending on location and time
+#'
+#' @param coords Object of class sftime including geometry and time
+#' @param stationary If TRUE simulate random noise, else add trend
+#' @param theta1 Trend with respect to the first spatial coordinate
+#' @param theta2 Trend with respect to the second spatial coordinate
+#' @param theta3 Trend with respect to time
+#'
+#' @returns vector representing the realized field at the corresponding
+#'   spatio-temporal locations
 gen_field_smooth_trend <- function(coords, stationary = TRUE, theta1 = 1,
                                    theta2 = -1, theta3 = 3) {
   white_noise <- stats::rnorm(nrow(coords), mean = 0, sd = 1)
@@ -136,14 +148,42 @@ coords <- coords %>%
   dplyr::mutate(time = rep(t, each = opt$n_spat)) %>%
   sftime::st_sftime(sf_column_name = "geometry", time_column_name = "time")
 
-# Compute latent components
-latent <- coords %>%
-  mutate(s1 = gen_field_smooth_trend(., stationary = TRUE),
-         s2 = gen_field_smooth_trend(., stationary = TRUE),
-         s3 = gen_field_smooth_trend(., stationary = TRUE),
-         s4 = gen_field_smooth_trend(., stationary = TRUE),
-         s5 = gen_field_smooth_trend(., stationary = TRUE),
-         s6 = gen_field_smooth_trend(., stationary = FALSE, 0.5, -2, 3),
-         s7 = gen_field_smooth_trend(., stationary = FALSE, -2, 3, 0.5),
-         s8 = gen_field_smooth_trend(., stationary = FALSE, 3, 0.5, -2)
-  )
+gen_mixing_matrix <- function(n_comp = 8) {
+  u <- pracma::randortho(n_comp, type = "orthonormal")
+  lambda <- diag(stats::runif(n_comp, -1, 1))
+  u %*% lambda %*% t(u)
+}
+
+
+simulate <- function(i, coords, a) {
+  # Compute latent components
+  latent <- coords %>%
+    mutate(s1 = gen_field_smooth_trend(., stationary = TRUE),
+           s2 = gen_field_smooth_trend(., stationary = TRUE),
+           s3 = gen_field_smooth_trend(., stationary = TRUE),
+           s4 = gen_field_smooth_trend(., stationary = TRUE),
+           s5 = gen_field_smooth_trend(., stationary = TRUE),
+           s6 = gen_field_smooth_trend(., stationary = FALSE, 0.5, -2, 3),
+           s7 = gen_field_smooth_trend(., stationary = FALSE, -2, 3, 0.5),
+           s8 = gen_field_smooth_trend(., stationary = FALSE, 3, 0.5, -2)) %>%
+    sftime::st_drop_time() %>%
+    sf::st_drop_geometry() %>%
+    dplyr::rename_with(~ paste0(.x, "m", i))
+  
+  # Compute observed field
+  observed <- latent %>%
+    as.matrix() %>%
+    apply(1, function(x) a %*% matrix(x, ncol = 1)) %>%
+    t() %>%
+    as_tibble()
+  colnames(observed) <- paste0("x", 1:ncol(latent), "m", i)
+  
+  list(latent = latent, observed = observed)
+}
+
+
+a <- gen_mixing_matrix(8)
+res <- simulate(1, coords, a)
+
+cbind(coords, res$latent, res$observed, sf_column_name = "geometry",
+      tc_column_name = "time")
