@@ -5,22 +5,25 @@ library(ggplot2)
 
 
 option_list <- list(
-  make_option("--n_spat", type = "integer", default = 5,
+  make_option("--n_spat", type = "integer", default = 10,
               help = "Number of spatial locations at each time point"),
-  make_option("--n_time", type = "integer", default = 3,
+  make_option("--n_time", type = "integer", default = 10,
               help = "number of time points, indexing starts from 0"),
   make_option("--m", type = "integer", default = 2,
               help = "Number of repetitions per scenario"),
+  make_option("--x_blocks", type = "character", default = "20:80",
+              help = "Segmentation of x coordinate, string gives proportions of the segment lengths"),
+  make_option("--y_blocks", type = "character", default = "33:33:34",
+              help = "Segmentation of y coordinate, string gives proportions of the segment lengths"),
+  make_option("--time_blocks", type = "character", default = "20:60:20",
+              help = "Segmentation of time, string gives proportions of the segment lengths"),
   make_option("--area", type = "character", default = "box",
               help = "map type, must belong to c('italy', 'finland', 'box')"),
-  make_option("--seed", type = "integer", default = 123,
-              help = "Seed for spatial locations"),
   make_option("--filename", type = "character", default = "example.pdf",
               help = "File name for the test figure")
 )
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
-set.seed(opt$seed)
 
 
 #' Compute negative square root of a positive definite matrix
@@ -89,18 +92,14 @@ gen_unif_coords_country <- function(n_spat, sf_country, bounds) {
 }
 
 
-#' Generate uniform sample of spatial locations from a rectangle
+#' Generate uniform sample of spatial locations from a box [0, 1] x [0, 1]
 #'
 #' @param n_spat Number of spatial locations
-#' @param left Left border
-#' @param right Right border
-#' @param low Lower border
-#' @param up Upper border
 #'
 #' @returns sf object with coordinated but with 0 features
-gen_unif_coords_box <- function(n_spat, left = 0, right = 1, low = 0, up = 1) {
-  x <- stats::runif(n_spat, left, right)
-  y <- stats::runif(n_spat, low, up)
+gen_unif_coords_box <- function(n_spat) {
+  x <- stats::runif(n_spat, 0, 1)
+  y <- stats::runif(n_spat, 0, 1)
   tibble::tibble(x = x, y = y) %>%
     sf::st_as_sf(coords = c("x", "y"))
 }
@@ -141,7 +140,7 @@ gen_field_smooth_trend <- function(coords, stationary = TRUE, theta1 = 1,
   } else {
     do.call(rbind, sf::st_geometry(coords)) %>%
       tibble::as_tibble() %>%
-      mutate(t = sftime::st_time(coords), e = white_noise) %>%
+      mutate(time = sftime::st_time(coords), e = white_noise) %>%
       purrr::pmap_dbl(~ theta1 * ..1 + theta2 * ..2 + theta3 * ..3 + ..4)
   }
 }
@@ -159,11 +158,11 @@ if (opt$area == "box") {
 }
 
 # Add temporal locations
-t <- 0:(opt$n_time - 1)
+time <- 0:(opt$n_time - 1)
 coords <- coords %>%
   replicate(opt$n_time, ., simplify = FALSE) %>%
   bind_rows() %>%
-  dplyr::mutate(time = rep(t, each = opt$n_spat)) %>%
+  dplyr::mutate(time = rep(time, each = opt$n_spat)) %>%
   sftime::st_sftime(sf_column_name = "geometry", time_column_name = "time")
 
 gen_mixing_matrix <- function(n_comp = 8) {
@@ -185,15 +184,15 @@ simulate <- function(i, coords, a) {
            s7 = gen_field_smooth_trend(., stationary = FALSE, -2, 3, 0.5),
            s8 = gen_field_smooth_trend(., stationary = FALSE, 3, 0.5, -2)) %>%
     sftime::st_drop_time() %>%
-    sf::st_drop_geometry() %>%
-    dplyr::rename_with(~ paste0(.x, "m", i))
+    sf::st_drop_geometry()
+  colnames(latent) <- paste0("f", 1:ncol(latent), "m", i)
   
   # Compute observed field
   observed <- latent %>%
     apply(1, function(x) a %*% matrix(x, ncol = 1)) %>%
     t() %>%
     as_tibble()
-  colnames(observed) <- paste0("x", 1:ncol(latent), "m", i)
+  colnames(observed) <- paste0("f", 1:ncol(observed), "m", i)
   
   # Compute whitened field
   mean_p <- colMeans(observed)
@@ -204,14 +203,53 @@ simulate <- function(i, coords, a) {
     apply(1, function(x) sqrtmat_inv(cov_p) %*% matrix(x, ncol = 1)) %>%
     t() %>%
     as_tibble()
-  colnames(whitened) <- paste0("x", 1:ncol(latent), "m", i)
+  colnames(whitened) <- paste0("f", 1:ncol(whitened), "m", i)
   
+  # Parse cut points
+  x_prop <- stringr::str_split(opt$x_blocks, ":", simplify = TRUE) %>%
+    as.integer()
+  y_prop <- stringr::str_split(opt$y_blocks, ":", simplify = TRUE) %>%
+    as.integer()
+  time_prop <- stringr::str_split(opt$time_blocks, ":", simplify = TRUE) %>%
+    as.integer()
+  if (sum(x_prop) != 100 | sum(y_prop) != 100 | sum(time_prop) != 100) {
+    rlang::abort("Sum of proportions must be 100.")
+  }
+  
+  time_cuts <- cumsum(c(0, time_prop / 100 * opt$n_time))
+  if (opt$area == "box") {
+    x_cuts <- cumsum(c(0, x_prop / 100))
+    y_cuts <- cumsum(c(0, y_prop / 100))
+  } else {
+    x_len <- country$bounding_box["lat_max"] - country$bounding_box["lat_min"]
+    y_len <- country$bounding_box["lon_max"] - country$bounding_box["lon_min"]
+    x_min <- country$bounding_box["lat_min"]
+    y_min <- country$bounding_box["lon_min"]
+    
+    x_cuts <- cumsum(c(x_min, x_prop / 100 * x_len))
+    y_cuts <- cumsum(c(y_min, y_prop / 100 * y_len))
+  }
+  
+  # Add segments to whitened field (NOTICE GROUPING)
+  whitened_with_seg <- cbind(coords, whitened, sf_column_name = "geometry",
+                             tc_column_name = "time") %>%
+    mutate(x_segment = cut(sf::st_coordinates(.)[, "X"], x_cuts,
+                           include.lowest = TRUE),
+           y_segment = cut(sf::st_coordinates(.)[, "Y"], y_cuts,
+                           include.lowest = TRUE),
+           time_segment = cut(time, time_cuts, right = FALSE)) %>%
+    sftime::st_drop_time() %>%
+    sf::st_drop_geometry() %>%
+    group_by(x_segment, y_segment, time_segment)
+  
+  # Compute means and sample sizes in segments
+  means_segment <- whitened_with_seg %>%
+    summarise(across(starts_with("f"), ~ mean(.x)), .groups = "drop") %>%
+    mutate(n = group_size(whitened_with_seg))
+
   list(latent = latent, observed = observed)
 }
 
 
 a <- gen_mixing_matrix(8)
 res <- simulate(1, coords, a)
-
-cbind(coords, res$latent, res$observed, sf_column_name = "geometry",
-      tc_column_name = "time")
