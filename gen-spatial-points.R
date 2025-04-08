@@ -5,17 +5,17 @@ library(ggplot2)
 
 
 option_list <- list(
-  make_option("--n_spat", type = "integer", default = 10,
+  make_option("--n_spat", type = "integer", default = 100,
               help = "Number of spatial locations at each time point"),
-  make_option("--n_time", type = "integer", default = 10,
+  make_option("--n_time", type = "integer", default = 100,
               help = "number of time points, indexing starts from 0"),
   make_option("--m", type = "integer", default = 2,
               help = "Number of repetitions per scenario"),
-  make_option("--x_blocks", type = "character", default = "20:80",
+  make_option("--x_blocks", type = "character", default = "33:33:34",
               help = "Segmentation of x coordinate, string gives proportions of the segment lengths"),
   make_option("--y_blocks", type = "character", default = "33:33:34",
               help = "Segmentation of y coordinate, string gives proportions of the segment lengths"),
-  make_option("--time_blocks", type = "character", default = "20:60:20",
+  make_option("--time_blocks", type = "character", default = "33:33:34",
               help = "Segmentation of time, string gives proportions of the segment lengths"),
   make_option("--area", type = "character", default = "box",
               help = "map type, must belong to c('italy', 'finland', 'box')"),
@@ -242,14 +242,24 @@ simulate <- function(i, coords, a) {
     sf::st_drop_geometry() %>%
     group_by(x_segment, y_segment, time_segment)
   
-  # Compute means and sample sizes in segments
+  # Compute means and proportional sample sizes in segments
   means_segment <- whitened_with_seg %>%
     summarise(across(starts_with("f"), ~ mean(.x)), .groups = "drop") %>%
-    mutate(n = group_size(whitened_with_seg))
-
-  list(latent = latent, observed = observed)
+    mutate(n_prop = group_size(whitened_with_seg) / (opt$n_spat * opt$n_time))
+  
+  # Compute variance of the segment means
+  outer_prods <- means_segment %>%
+    select(starts_with("f")) %>%
+    as.matrix() %>%
+    apply(1, function(x) x %o% x, simplify = FALSE)
+  
+  mean_var <- purrr::pmap(list(a = means_segment$n_prop, b = outer_prods),
+                          \(a, b) a * b) %>%
+    purrr::reduce(`+`)
+  mean_var
 }
-
 
 a <- gen_mixing_matrix(8)
 res <- simulate(1, coords, a)
+eigen(res)$values # Three nonzero eigenvalues
+
