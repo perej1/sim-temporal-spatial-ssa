@@ -1,7 +1,5 @@
-library(tmap)
 library(dplyr)
 library(optparse)
-library(ggplot2)
 
 
 option_list <- list(
@@ -16,11 +14,7 @@ option_list <- list(
   make_option("--y_blocks", type = "character", default = "33:33:34",
               help = "Segmentation of y coordinate, string gives proportions of the segment lengths"),
   make_option("--time_blocks", type = "character", default = "33:33:34",
-              help = "Segmentation of time, string gives proportions of the segment lengths"),
-  make_option("--area", type = "character", default = "box",
-              help = "map type, must belong to c('italy', 'finland', 'box')"),
-  make_option("--filename", type = "character", default = "example.pdf",
-              help = "File name for the test figure")
+              help = "Segmentation of time, string gives proportions of the segment lengths")
 )
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
@@ -44,54 +38,6 @@ sqrtmat_inv <- function(sigma) {
 }
 
 
-#' Get country bounding box and polygon
-#'
-#' @param country Name of the country in lower case
-#'
-#' @returns List of the bounding box and polygon corresponding to the country
-get_country <- function(country) {
-  if (country == "finland") {
-    name_polygon <- "Finland"
-    name_box <- "FI"
-  } else if (country == "italy") {
-    name_polygon <- "Italy"
-    name_box <- "IT"
-  } else {
-    rlang::abort("Invalid country. Country must be in c('finland', 'italy')")
-  }
-
-  sf_country <- rnaturalearth::ne_countries(returnclass = "sf",
-                                            scale = "medium",
-                                            country = name_polygon) %>%
-    sf::st_transform(crs = 4326)
-
-  bounds <- rjson::fromJSON(file = "data/bounding-boxes.json")[[name_box]][[2]]
-  names(bounds) <- c("lon_min", "lat_min", "lon_max", "lat_max")
-  list(bounding_box = bounds, sf_country = sf_country)
-}
-
-
-#' Generate uniform sample of spatial locations from a country
-#'
-#' Points that do not lie on the country polygon are filtered out. Thus, the
-#'  effective sample size is <= n.
-#'
-#' @param n_spat Number of spatial locations
-#' @param sf_country Country polygon
-#' @param bounds Country bounding box
-#'
-#' @returns sf object with coordinates and 0 features
-gen_unif_coords_country <- function(n_spat, sf_country, bounds) {
-
-  lat <- stats::runif(n_spat, bounds["lat_min"], bounds["lat_max"])
-  lon <- stats::runif(n_spat, bounds["lon_min"], bounds["lon_max"])
-
-  tibble::tibble(lat = lat, lon = lon) %>%
-    sf::st_as_sf(coords = c("lon", "lat"), crs = 4326) %>%
-    sf::st_filter(sf_country, .predicate = sf::st_within)
-}
-
-
 #' Generate uniform sample of spatial locations from a box [0, 1] x [0, 1]
 #'
 #' @param n_spat Number of spatial locations
@@ -102,23 +48,6 @@ gen_unif_coords_box <- function(n_spat) {
   y <- stats::runif(n_spat, 0, 1)
   tibble::tibble(x = x, y = y) %>%
     sf::st_as_sf(coords = c("x", "y"))
-}
-
-
-#' Generate sample of spatial locations from a distribution on a country polygon
-#'
-#' @param n_spat Number of spatial locations
-#' @param gen_style_coords Function for generating samples
-#' @param ... Optional parameters for the function gen_style_coords
-#'
-#' @returns sf object with coordinated but with 0 features
-gen_coords <- function(n_spat = 100, gen_style_coords, ...) {
-  coords <- gen_style_coords(n_spat, ...)
-  while (nrow(coords) < n_spat) {
-    coords <- rbind(coords, gen_style_coords(n_spat, ...))
-  }
-  coords %>%
-    dplyr::slice(1:n_spat)
 }
 
 
@@ -147,15 +76,7 @@ gen_field_smooth_trend <- function(coords, stationary = TRUE, theta1 = 1,
 
 
 # Compute spatial locations
-if (opt$area == "box") {
-  coords <- gen_coords(opt$n_spat, gen_unif_coords_box)
-} else if (opt$area %in% c("finland", "italy")) {
-  country <- get_country(opt$area)
-  coords <- gen_coords(opt$n_spat, gen_unif_coords_country, country$sf_country,
-                       country$bounding_box)
-} else {
-  rlang::abort("Invalid area. Area must be in c('finland', 'italy', 'box')")
-}
+coords <- gen_unif_coords_box(opt$n_spat)
 
 # Add temporal locations
 time <- 0:(opt$n_time - 1)
@@ -164,12 +85,6 @@ coords <- coords %>%
   bind_rows() %>%
   dplyr::mutate(time = rep(time, each = opt$n_spat)) %>%
   sftime::st_sftime(sf_column_name = "geometry", time_column_name = "time")
-
-gen_mixing_matrix <- function(n_comp = 8) {
-  u <- pracma::randortho(n_comp, type = "orthonormal")
-  lambda <- diag(stats::runif(n_comp, -1, 1))
-  u %*% lambda %*% t(u)
-}
 
 
 simulate <- function(i, coords, a) {
@@ -217,18 +132,8 @@ simulate <- function(i, coords, a) {
   }
   
   time_cuts <- cumsum(c(0, time_prop / 100 * opt$n_time))
-  if (opt$area == "box") {
-    x_cuts <- cumsum(c(0, x_prop / 100))
-    y_cuts <- cumsum(c(0, y_prop / 100))
-  } else {
-    x_len <- country$bounding_box["lat_max"] - country$bounding_box["lat_min"]
-    y_len <- country$bounding_box["lon_max"] - country$bounding_box["lon_min"]
-    x_min <- country$bounding_box["lat_min"]
-    y_min <- country$bounding_box["lon_min"]
-    
-    x_cuts <- cumsum(c(x_min, x_prop / 100 * x_len))
-    y_cuts <- cumsum(c(y_min, y_prop / 100 * y_len))
-  }
+  x_cuts <- cumsum(c(0, x_prop / 100))
+  y_cuts <- cumsum(c(0, y_prop / 100))
   
   # Add segments to whitened field (NOTICE GROUPING)
   whitened_with_seg <- cbind(coords, whitened, sf_column_name = "geometry",
