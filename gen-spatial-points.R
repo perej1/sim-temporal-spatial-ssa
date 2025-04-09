@@ -3,9 +3,9 @@ library(optparse)
 
 
 option_list <- list(
-  make_option("--n_spat", type = "integer", default = 100,
+  make_option("--n_spat", type = "integer", default = 1000,
               help = "Number of spatial locations at each time point"),
-  make_option("--n_time", type = "integer", default = 100,
+  make_option("--n_time", type = "integer", default = 1000,
               help = "number of time points, indexing starts from 0"),
   make_option("--m", type = "integer", default = 2,
               help = "Number of repetitions per scenario"),
@@ -14,7 +14,9 @@ option_list <- list(
   make_option("--y_blocks", type = "character", default = "33:33:34",
               help = "Segmentation of y coordinate, string gives proportions of the segment lengths"),
   make_option("--time_blocks", type = "character", default = "33:33:34",
-              help = "Segmentation of time, string gives proportions of the segment lengths")
+              help = "Segmentation of time, string gives proportions of the segment lengths"),
+  make_option("--setting", type = "integer", default = 1,
+              help = "Setting number, see README for description of different settings")
 )
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
@@ -83,31 +85,35 @@ time <- 0:(opt$n_time - 1)
 coords <- coords %>%
   replicate(opt$n_time, ., simplify = FALSE) %>%
   bind_rows() %>%
-  dplyr::mutate(time = rep(time, each = opt$n_spat)) %>%
+  mutate(time = rep(time, each = opt$n_spat)) %>%
   sftime::st_sftime(sf_column_name = "geometry", time_column_name = "time")
 
 
 simulate <- function(i, coords, a) {
   # Compute latent components
-  latent <- coords %>%
-    mutate(s1 = gen_field_smooth_trend(., stationary = TRUE),
-           s2 = gen_field_smooth_trend(., stationary = TRUE),
-           s3 = gen_field_smooth_trend(., stationary = TRUE),
-           s4 = gen_field_smooth_trend(., stationary = TRUE),
-           s5 = gen_field_smooth_trend(., stationary = TRUE),
-           s6 = gen_field_smooth_trend(., stationary = FALSE, 0.5, -2, 3),
-           s7 = gen_field_smooth_trend(., stationary = FALSE, -2, 3, 0.5),
-           s8 = gen_field_smooth_trend(., stationary = FALSE, 3, 0.5, -2)) %>%
-    sftime::st_drop_time() %>%
-    sf::st_drop_geometry()
-  colnames(latent) <- paste0("f", 1:ncol(latent), "m", i)
+  if (opt$setting == 1) {
+    n_nonstationary <- 3
+    n_comp <- 8
+    latent <- coords %>%
+      mutate(s1 = gen_field_smooth_trend(., stationary = FALSE, 0.5, -2, 3),
+             s2 = gen_field_smooth_trend(., stationary = FALSE, -2, 3, 0.5),
+             s3 = gen_field_smooth_trend(., stationary = FALSE, 3, 0.5, -2),
+             s4 = gen_field_smooth_trend(., stationary = TRUE),
+             s5 = gen_field_smooth_trend(., stationary = TRUE),
+             s6 = gen_field_smooth_trend(., stationary = TRUE),
+             s7 = gen_field_smooth_trend(., stationary = TRUE),
+             s8 = gen_field_smooth_trend(., stationary = TRUE)) %>%
+      sftime::st_drop_time() %>%
+      sf::st_drop_geometry()
+    colnames(latent) <- paste0("f", 1:n_comp)
+  }
   
   # Compute observed field
   observed <- latent %>%
     apply(1, function(x) a %*% matrix(x, ncol = 1)) %>%
     t() %>%
     as_tibble()
-  colnames(observed) <- paste0("f", 1:ncol(observed), "m", i)
+  colnames(observed) <- paste0("f", 1:n_comp)
   
   # Compute whitened field
   mean_p <- colMeans(observed)
@@ -118,7 +124,7 @@ simulate <- function(i, coords, a) {
     apply(1, function(x) cov_p_inv_sqrt %*% matrix(x, ncol = 1)) %>%
     t() %>%
     as_tibble()
-  colnames(whitened) <- paste0("f", 1:ncol(whitened), "m", i)
+  colnames(whitened) <- paste0("f", 1:n_comp)
   
   # Parse cut points
   x_prop <- stringr::str_split(opt$x_blocks, ":", simplify = TRUE) %>%
@@ -165,13 +171,13 @@ simulate <- function(i, coords, a) {
   
   # Compute unmixing matrix
   w <- t(eigen(mean_var)$vectors) %*% cov_p_inv_sqrt
-  w_nonstationary <- w[1:3, ]
-  w_stationary <- w[4:8, ]
+  w_nonstationary <- w[1:n_nonstationary, ]
+  w_stationary <- w[(n_nonstationary + 1):n_comp, ]
   
   # Compute performance indices
   a_inv <- solve(a)
-  a_inv_proj_stat <- LDRTools::B2P(t(a_inv[1:5, ]))
-  a_inv_proj_nonstat <- LDRTools::B2P(t(a_inv[6:8, ]))
+  a_inv_proj_nonstat <- LDRTools::B2P(t(a_inv[1:n_nonstationary, ]))
+  a_inv_proj_stat <- LDRTools::B2P(t(a_inv[(n_nonstationary + 1):n_comp, ]))
   w_proj_nonstat <- LDRTools::B2P(t(w_nonstationary))
   w_proj_stat <- LDRTools::B2P(t(w_stationary))
   ind_stat <- LDRTools::Pdist(list(a_inv_proj_stat, w_proj_stat),
