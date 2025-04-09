@@ -196,11 +196,11 @@ simulate <- function(i, coords, a) {
   
   # Compute whitened field
   mean_p <- colMeans(observed)
-  cov_p <- cov(observed)
+  cov_p_inv_sqrt <- sqrtmat_inv(cov(observed))
   
   whitened <- observed %>%
     sweep(2, mean_p, "-") %>%
-    apply(1, function(x) sqrtmat_inv(cov_p) %*% matrix(x, ncol = 1)) %>%
+    apply(1, function(x) cov_p_inv_sqrt %*% matrix(x, ncol = 1)) %>%
     t() %>%
     as_tibble()
   colnames(whitened) <- paste0("f", 1:ncol(whitened), "m", i)
@@ -256,10 +256,31 @@ simulate <- function(i, coords, a) {
   mean_var <- purrr::pmap(list(a = means_segment$n_prop, b = outer_prods),
                           \(a, b) a * b) %>%
     purrr::reduce(`+`)
-  mean_var
+  print(eigen(mean_var)$values)
+  
+  # Compute unmixing matrix
+  w <- t(eigen(mean_var)$vectors) %*% cov_p_inv_sqrt
+  w_nonstationary <- w[1:3, ]
+  w_stationary <- w[4:8, ]
+  
+  # Compute performance indices
+  a_inv <- solve(a)
+  a_inv_proj_stat <- LDRTools::B2P(t(a_inv[1:5, ]))
+  a_inv_proj_nonstat <- LDRTools::B2P(t(a_inv[6:8, ]))
+  w_proj_nonstat <- LDRTools::B2P(t(w_nonstationary))
+  w_proj_stat <- LDRTools::B2P(t(w_stationary))
+  ind_stat <- LDRTools::Pdist(list(a_inv_proj_stat, w_proj_stat),
+                              weights = "constant")
+  ind_nonstat <- LDRTools::Pdist(list(a_inv_proj_nonstat, w_proj_nonstat),
+                                 weights = "constant")
+  
+  ret <- list(w, c(stationary = ind_stat, nonstationary = ind_nonstat))
+  names(ret) <- c("unmixing", "performance")
+  ret
 }
 
-a <- gen_mixing_matrix(8)
-res <- simulate(1, coords, a)
-eigen(res)$values # Three nonzero eigenvalues
 
+set.seed(123)
+a <- matrix(runif(8 * 8, 1, 100), ncol = 8)
+res <- simulate(1, coords, a)
+res
