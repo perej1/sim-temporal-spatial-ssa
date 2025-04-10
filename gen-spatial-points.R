@@ -3,11 +3,11 @@ library(optparse)
 
 
 option_list <- list(
-  make_option("--n_spat", type = "integer", default = 1000,
+  make_option("--n_spat", type = "integer", default = 10,
               help = "Number of spatial locations at each time point"),
-  make_option("--n_time", type = "integer", default = 1000,
+  make_option("--n_time", type = "integer", default = 10,
               help = "number of time points, indexing starts from 0"),
-  make_option("--m", type = "integer", default = 2,
+  make_option("--m", type = "integer", default = 1,
               help = "Number of repetitions per scenario"),
   make_option("--x_blocks", type = "character", default = "33:33:34",
               help = "Segmentation of x coordinate, string gives proportions of the segment lengths"),
@@ -16,7 +16,8 @@ option_list <- list(
   make_option("--time_blocks", type = "character", default = "33:33:34",
               help = "Segmentation of time, string gives proportions of the segment lengths"),
   make_option("--setting", type = "integer", default = 1,
-              help = "Setting number, see README for description of different settings")
+              help = "Setting number, see README for description of different settings"),
+  make_option("--file", default = "results/test.txt", help = "Output file name")
 )
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
@@ -92,6 +93,7 @@ coords <- coords %>%
 simulate <- function(i, coords, a) {
   # Compute latent components
   if (opt$setting == 1) {
+    a <- matrix(runif(8 * 8, 1, 100), ncol = 8)
     n_nonstationary <- 3
     n_comp <- 8
     latent <- coords %>%
@@ -108,6 +110,7 @@ simulate <- function(i, coords, a) {
     colnames(latent) <- paste0("f", 1:n_comp)
   }
   
+  set.seed(123)
   # Compute observed field
   observed <- latent %>%
     apply(1, function(x) a %*% matrix(x, ncol = 1)) %>%
@@ -185,13 +188,12 @@ simulate <- function(i, coords, a) {
   ind_nonstat <- LDRTools::Pdist(list(a_inv_proj_nonstat, w_proj_nonstat),
                                  weights = "constant")
   
-  ret <- list(w, c(stationary = ind_stat, nonstationary = ind_nonstat))
-  names(ret) <- c("unmixing", "performance")
+  ret <- list(w, c(stationary = ind_stat, nonstationary = ind_nonstat),
+              eigen_val = eigen(mean_var)$values)
+  names(ret) <- c("unmixing", "performance", "mean_var_eigen_values")
   ret
 }
 
-
-set.seed(123)
-a <- matrix(runif(8 * 8, 1, 100), ncol = 8)
-res <- simulate(1, coords, a)
-res
+file_con <- file(opt$file)
+writeLines(capture.output(simulate(1, coords, a)), file_con)
+close(file_con)
