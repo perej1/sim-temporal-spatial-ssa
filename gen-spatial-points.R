@@ -170,7 +170,6 @@ simulate <- function(i, coords, a) {
   mean_var <- purrr::pmap(list(a = means_segment$n_prop, b = outer_prods),
                           \(a, b) a * b) %>%
     purrr::reduce(`+`)
-  print(eigen(mean_var)$values)
   
   # Compute unmixing matrix
   w <- t(eigen(mean_var)$vectors) %*% cov_p_inv_sqrt
