@@ -46,10 +46,10 @@ gen_unif_coords_box <- function(n_spatial, seed) {
 #' @returns sftime object with locations and time but no fields
 gen_coords <- function(n_spatial, n_time, seed) {
   set.seed(seed)
-  
+
   # Compute spatial locations
   coords <- gen_unif_coords_box(n_spatial, seed)
-  
+
   # Add temporal locations
   time <- 0:(n_time - 1)
   coords %>%
@@ -60,22 +60,27 @@ gen_coords <- function(n_spatial, n_time, seed) {
 }
 
 
-compute_segments <- function(coords,
-                             x_prop = c(33,33,34),
-                             y_prop = c(33,33,34),
-                             time_prop = c(33,33,34)) {
-  if (sum(x_prop) != 100 | sum(y_prop) != 100 | sum(time_prop) != 100) {
+#' Compute segments for spatio-temporal coordinates
+#'
+#' @param coords sftime object with locations and time but no fields
+#' @param x_prop Division of x-axis of the [0,1] x [0,1] box in terms of %
+#' @param y_prop Division of y-axis of the [0,1] x [0,1] box in terms of %
+#' @param time_prop Division of time in terms of %
+#'
+#' @returns Tibble of segments for different axes (3 columns)
+compute_segments <- function(coords, x_prop, y_prop, time_prop) {
+  if (sum(x_prop) != 100 || sum(y_prop) != 100 || sum(time_prop) != 100) {
     rlang::abort("Sum of proportions must be 100.")
   }
-  
+
   n_time <- sftime::st_time(coords) %>%
     unique() %>%
     max() + 1
-  
+
   x_cuts <- c(0, cumsum(x_prop / 100))
   y_cuts <- c(0, cumsum(y_prop / 100))
   time_cuts <- c(1, cumsum(time_prop / 100 * n_time)) - 1
-  
+
   coords %>%
     mutate(x_segment = cut(sf::st_coordinates(.)[, "X"], x_cuts,
                            include.lowest = TRUE),
@@ -87,23 +92,28 @@ compute_segments <- function(coords,
 }
 
 
-gen_field_cluster <- function(coords,
-                              mu = 1:27,
-                              sigma = rep(0.01, 27),
-                              x_prop = c(33,33,34),
-                              y_prop = c(33,33,34),
-                              time_prop = c(33,33,34)) {
+#' Simulate field that is normally distributed in each segment
+#'
+#' @param coords sftime object with locations and time but no fields
+#' @param mu Expected value for each segment
+#' @param sigma Standard deviation for each segment
+#' @param x_prop Division of x-axis of the [0,1] x [0,1] box in terms of %
+#' @param y_prop Division of y-axis of the [0,1] x [0,1] box in terms of %
+#' @param time_prop Division of time in terms of %
+#'
+#' @returns Vector giving value of the field at each spatio-temporal coordinate
+gen_field_cluster <- function(coords, mu, sigma, x_prop, y_prop, time_prop) {
   mu_sigma_len <- length(x_prop) * length(y_prop) * length(time_prop)
-  if(length(mu) != mu_sigma_len | length(sigma) != mu_sigma_len) {
+  if (length(mu) != mu_sigma_len || length(sigma) != mu_sigma_len) {
     rlang::abort("'mu' or 'sigma' has wrong length.")
   }
   segments <- compute_segments(coords, x_prop, y_prop, time_prop) %>%
     mutate(comb = interaction(x_segment, y_segment, time_segment)) %>%
     pull(comb)
-  
+
   indices <- match(segments, levels(segments))
   mu_for_segment <- mu[indices]
   sigma_for_segment <- sigma[indices]
-  
+
   stats::rnorm(nrow(coords), mu_for_segment, sigma_for_segment)
 }
