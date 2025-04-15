@@ -3,11 +3,11 @@ source("functions.R")
 
 
 option_list <- list(
-  make_option("--n_spatial", type = "integer", default = 1000,
+  make_option("--n_spatial", type = "integer", default = 100,
               help = "Number of spatial locations at each time point"),
   make_option("--n_time", type = "integer", default = 100,
               help = "number of time points, indexing starts from 0"),
-  make_option("--m", type = "integer", default = 1,
+  make_option("--m", type = "integer", default = 3,
               help = "Number of repetitions per scenario"),
   make_option("--x_blocks", type = "character", default = "33:33:34",
               help = "Segmentation of x coordinate, string gives proportions of the segment lengths"),
@@ -18,7 +18,9 @@ option_list <- list(
   make_option("--var_nonstationary", type = "logical", default = FALSE,
               help = "If true then nonstationarity in variance is also considered in the performance"),
   make_option("--seed_spatial", type = "integer", default = 123,
-              help = "Seed for generating spatial locations")
+              help = "Seed for generating spatial locations"),
+  make_option("--seed_sim", type = "integer", default = 321,
+              help = "Seed for for the function 'simulate'")
 )
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
@@ -149,5 +151,9 @@ simulate <- function(i, coords, a) {
 a <- matrix(c(88, 6, 30, 70, 39, 74, 46, 72, 56, 65, 10, 12, 53, 96, 93, 49,
               62, 63, 77, 92, 59, 7, 57, 96, 23), ncol = 5, byrow = TRUE)
 coords <- gen_coords(opt$n_spatial, opt$n_time, opt$seed_spatial)
-res <- simulate(1, coords, a)
-print(res)
+
+RNGkind("L'Ecuyer-CMRG")
+set.seed(opt$seed_sim)
+res <- parallel::mclapply(1:opt$m, simulate, coords = coords, a = a,
+                          mc.set.seed = TRUE,  mc.cores = 2)
+res
