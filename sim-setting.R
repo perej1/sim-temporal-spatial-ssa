@@ -7,7 +7,7 @@ option_list <- list(
               help = "Number of spatial locations at each time point"),
   make_option("--n_time", type = "integer", default = 100,
               help = "number of time points, indexing starts from 0"),
-  make_option("--m", type = "integer", default = 3,
+  make_option("--m", type = "integer", default = 16,
               help = "Number of repetitions per scenario"),
   make_option("--x_blocks", type = "character", default = "33:33:34",
               help = "Segmentation of x coordinate, string gives proportions of the segment lengths"),
@@ -141,19 +141,47 @@ simulate <- function(i, coords, a) {
   ind_nonstat <- LDRTools::Pdist(list(a_inv_proj_nonstat, w_proj_nonstat),
                                  weights = "constant")
 
-  res <- list(w, c(stationary = ind_stat, nonstationary = ind_nonstat),
+  res <- list(c(stationary = ind_stat, nonstationary = ind_nonstat),
               eigen_val = eigen(mean_var)$values)
-  names(res) <- c("unmixing", "performance", "mean_var_eigen_values")
+  names(res) <- c("performance", "mean_var_eigen_values")
   res
 }
 
 
-a <- matrix(c(88, 6, 30, 70, 39, 74, 46, 72, 56, 65, 10, 12, 53, 96, 93, 49,
-              62, 63, 77, 92, 59, 7, 57, 96, 23), ncol = 5, byrow = TRUE)
+# Set mixing matrix and spatio-temporal coordinates
+a <- c(88, 6, 30, 70, 39,
+       74, 46, 72, 56, 65,
+       10, 12, 53, 96, 93,
+       49, 62, 63, 77, 92,
+       59, 7, 57, 96, 23) %>%
+  matrix(ncol = 5, byrow = TRUE)
 coords <- gen_coords(opt$n_spatial, opt$n_time, opt$seed_spatial)
 
+# Perform m repetitions fo the scenario
 RNGkind("L'Ecuyer-CMRG")
 set.seed(opt$seed_sim)
 res <- parallel::mclapply(1:opt$m, simulate, coords = coords, a = a,
-                          mc.set.seed = TRUE,  mc.cores = 2)
-res
+                          mc.set.seed = TRUE,
+                          mc.cores = parallel::detectCores()) %>%
+  purrr::transpose()
+
+# Collect results in a matrix (one row corresponds to one repetition)
+performance <- do.call(rbind, res$performance)
+eigenval <- do.call(rbind, res$mean_var_eigen_values)
+colnames(eigenval) <- paste0("f", 1:5)
+
+# Save results
+filename <- paste0("n_spatial_", opt$n_spatial,
+                   "_n_time_", opt$n_time,
+                   "_x_blocks_", opt$x_blocks,
+                   "_y_blocks_", opt$y_blocks,
+                   "_time_blocks_", opt$time_blocks,
+                   "_var_nonstationary_", opt$var_nonstationary,
+                   "_seed_spatial_", opt$seed_spatial,
+                   "_seed_sim_", opt$seed_sim, ".csv")
+
+tibble::as_tibble(performance) %>%
+  readr::write_csv(paste0("results/perf/", filename))
+
+tibble::as_tibble(eigenval) %>%
+  readr::write_csv(paste0("results/eigen/", filename))
