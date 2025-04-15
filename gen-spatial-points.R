@@ -3,9 +3,9 @@ library(optparse)
 
 
 option_list <- list(
-  make_option("--n_spat", type = "integer", default = 10,
+  make_option("--n_spatial", type = "integer", default = 1000,
               help = "Number of spatial locations at each time point"),
-  make_option("--n_time", type = "integer", default = 10,
+  make_option("--n_time", type = "integer", default = 100,
               help = "number of time points, indexing starts from 0"),
   make_option("--m", type = "integer", default = 1,
               help = "Number of repetitions per scenario"),
@@ -17,6 +17,8 @@ option_list <- list(
               help = "Segmentation of time, string gives proportions of the segment lengths"),
   make_option("--setting", type = "integer", default = 1,
               help = "Setting number, see README for description of different settings"),
+  make_option("--seed_spatial", type = "integer", default = 123,
+              help = "Seed for generating spatial locations"),
   make_option("--file", default = "results/test.txt", help = "Output file name")
 )
 opt_parser <- OptionParser(option_list = option_list)
@@ -43,14 +45,88 @@ sqrtmat_inv <- function(sigma) {
 
 #' Generate uniform sample of spatial locations from a box [0, 1] x [0, 1]
 #'
-#' @param n_spat Number of spatial locations
+#' @param n_spatial Number of spatial locations
+#' @param seed Seed for generating spatial locations
 #'
 #' @returns sf object with coordinated but with 0 features
-gen_unif_coords_box <- function(n_spat) {
-  x <- stats::runif(n_spat, 0, 1)
-  y <- stats::runif(n_spat, 0, 1)
+gen_unif_coords_box <- function(n_spatial, seed) {
+  set.seed(seed)
+  x <- stats::runif(n_spatial, 0, 1)
+  y <- stats::runif(n_spatial, 0, 1)
   tibble::tibble(x = x, y = y) %>%
     sf::st_as_sf(coords = c("x", "y"))
+}
+
+
+#' Generate spatio-temporal locations on which the field is observed
+#'
+#' Locations are uniformly distributed but they are the same for each time
+#' point. Field is observed at each time point 0, 1, ..., n_time - 1.
+#'
+#' @param n_spatial Number of spatial locations
+#' @param n_time Number of time points
+#' @param seed Seed for generating spatial locations
+#'
+#' @returns sftime object with locations and time but no fields
+gen_coords <- function(n_spatial, n_time, seed) {
+  set.seed(seed)
+  
+  # Compute spatial locations
+  coords <- gen_unif_coords_box(n_spatial, seed)
+  
+  # Add temporal locations
+  time <- 0:(n_time - 1)
+  coords %>%
+    replicate(n_time, ., simplify = FALSE) %>%
+    bind_rows() %>%
+    mutate(time = rep(time, each = n_spatial)) %>%
+    sftime::st_sftime(sf_column_name = "geometry", time_column_name = "time")
+}
+
+
+compute_segments <- function(coords,
+                             n_time,
+                             x_prop = c(33,33,34),
+                             y_prop = c(33,33,34),
+                             time_prop = c(33,33,34)) {
+  if (sum(x_prop) != 100 | sum(y_prop) != 100 | sum(time_prop) != 100) {
+    rlang::abort("Sum of proportions must be 100.")
+  }
+  
+  x_cuts <- c(0, cumsum(x_prop / 100))
+  y_cuts <- c(0, cumsum(y_prop / 100))
+  time_cuts <- c(1, cumsum(time_prop / 100 * n_time)) - 1
+  
+  coords %>%
+    mutate(x_segment = cut(sf::st_coordinates(.)[, "X"], x_cuts,
+                           include.lowest = TRUE),
+           y_segment = cut(sf::st_coordinates(.)[, "Y"], y_cuts,
+                           include.lowest = TRUE),
+           time_segment = cut(time, time_cuts, include.lowest = TRUE)) %>%
+    sftime::st_drop_time() %>%
+    sf::st_drop_geometry()
+}
+
+
+gen_field_cluster <- function(coords,
+                              n_time,
+                              mu = 1:27,
+                              sigma = rep(0.01, 27),
+                              x_prop = c(33,33,34),
+                              y_prop = c(33,33,34),
+                              time_prop = c(33,33,34)) {
+  segments <- compute_segments(coords, n_time, x_prop, y_prop, time_prop) %>%
+    mutate(comb = interaction(x_segment, y_segment, time_segment)) %>%
+    pull(comb)
+  
+  indices <- match(segments, levels(segments))
+  mu_for_segment <- mu[indices]
+  names(mu_for_segment) <- levels(segments)[indices]
+  sigma_for_segment <- sigma[indices]
+  names(sigma_for_segment) <- levels(segments)[indices]
+  
+  data <- stats::rnorm(nrow(coords), mu_for_segment, sigma_for_segment)
+  names(data) <- levels(segments)[indices]
 }
 
 
@@ -78,22 +154,9 @@ gen_field_smooth_trend <- function(coords, stationary = TRUE, theta1 = 1,
 }
 
 
-# Compute spatial locations
-coords <- gen_unif_coords_box(opt$n_spat)
-
-# Add temporal locations
-time <- 0:(opt$n_time - 1)
-coords <- coords %>%
-  replicate(opt$n_time, ., simplify = FALSE) %>%
-  bind_rows() %>%
-  mutate(time = rep(time, each = opt$n_spat)) %>%
-  sftime::st_sftime(sf_column_name = "geometry", time_column_name = "time")
-
-
 simulate <- function(i, coords, a) {
-  # Compute latent components
   if (opt$setting == 1) {
-    a <- matrix(runif(8 * 8, 1, 100), ncol = 8)
+    # Compute latent components
     n_nonstationary <- 3
     n_comp <- 8
     latent <- coords %>%
@@ -193,6 +256,8 @@ simulate <- function(i, coords, a) {
   ret
 }
 
-file_con <- file(opt$file)
-writeLines(capture.output(simulate(1, coords, a)), file_con)
-close(file_con)
+a <- matrix(runif(8 * 8, 1, 100), ncol = 8)
+coords <- gen_coords(opt$n_spatial, opt$n_time, opt$seed_spatial)
+res <- simulate(1, coords, a)
+print(res)
+
