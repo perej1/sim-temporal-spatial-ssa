@@ -3,9 +3,9 @@ source("functions.R")
 
 
 option_list <- list(
-  make_option("--n_spatial", type = "integer", default = 10,
+  make_option("--n_spatial", type = "integer", default = 100,
               help = "Number of spatial locations at each time point"),
-  make_option("--n_time", type = "integer", default = 10,
+  make_option("--n_time", type = "integer", default = 100,
               help = "number of time points, indexing starts from 0"),
   make_option("--m", type = "integer", default = 100,
               help = "Number of repetitions per scenario"),
@@ -15,8 +15,10 @@ option_list <- list(
               help = "Segmentation of y coordinate, string gives proportions of the segment lengths"),
   make_option("--time_blocks", type = "character", default = "33:33:34",
               help = "Segmentation of time, string gives proportions of the segment lengths"),
-  make_option("--var", type = "logical", default = FALSE,
-              help = "If true then nonstationarity in variance is also considered in the performance"),
+  make_option("--include_var_nonstationary", type = "logical", default = FALSE,
+              help = "If true then variance of the fourth component is nonstationary"),
+  make_option("--dim_nonstationary", type = "integer", default = 3,
+              help = "Dimension of the nonstationary subspace"),
   make_option("--seed_spatial", type = "integer", default = 123,
               help = "Seed for generating spatial locations"),
   make_option("--seed_sim", type = "integer", default = 321,
@@ -58,19 +60,17 @@ simulate <- function(i, coords, a) {
   y_prop4 <- c(50, 50)
   time_prop4 <- c(50, 50)
   mu4 <- rep(0, 8)
-  sigma4 <- 2^(0:7)
+  sigma4 <- if (opt$include_var_nonstationary) 2^(0:7) else rep(1, 8)
 
   # Stationary component 5
   # - Mean and variance do not change
   x_prop5 <- 100
   y_prop5 <- 100
   time_prop5 <- 100
-  mu5 <- 0
+  mu5 <- -10
   sigma5 <- 1
 
   # Compute latent components
-  n_nonstationary <- ifelse(opt$var, 4, 3)
-  n_comp <- 5
   latent <- coords %>%
     mutate(
       f1 = gen_field_cluster(., mu1, sigma1, x_prop1, y_prop1, time_prop1),
@@ -81,6 +81,9 @@ simulate <- function(i, coords, a) {
     ) %>%
     sftime::st_drop_time() %>%
     sf::st_drop_geometry()
+
+  n_nonstationary <- opt$dim_nonstationary
+  n_comp <- ncol(latent)
 
   # Compute observed field
   observed <- latent %>%
@@ -178,7 +181,8 @@ filename <- paste0("n_spatial_", opt$n_spatial,
                    "_x_blocks_", opt$x_blocks,
                    "_y_blocks_", opt$y_blocks,
                    "_time_blocks_", opt$time_blocks,
-                   "_var_", opt$var,
+                   "_include_var_nonstationary_", opt$include_var_nonstationary,
+                   "_dim_nonstationary_", opt$dim_nonstationary,
                    "_seed_spatial_", opt$seed_spatial,
                    "_seed_sim_", opt$seed_sim, ".csv")
 
