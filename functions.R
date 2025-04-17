@@ -1,5 +1,5 @@
 # Functions for the simulations
-library(dplyr)
+suppressMessages(library(dplyr))
 
 #' Compute negative square root of a positive definite matrix
 #'
@@ -79,7 +79,7 @@ compute_segments <- function(coords, x_prop, y_prop, time_prop) {
 
   x_cuts <- c(0, cumsum(x_prop / 100))
   y_cuts <- c(0, cumsum(y_prop / 100))
-  time_cuts <- c(1, cumsum(time_prop / 100 * n_time)) - 1
+  time_cuts <- quantile(0:(n_time - 1), c(0, cumsum(time_prop / 100)))
 
   coords %>%
     mutate(x_segment = cut(sf::st_coordinates(.)[, "X"], x_cuts,

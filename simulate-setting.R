@@ -3,11 +3,11 @@ source("functions.R")
 
 
 option_list <- list(
-  make_option("--n_spatial", type = "integer", default = 100,
+  make_option("--n_spatial", type = "integer", default = 10,
               help = "Number of spatial locations at each time point"),
-  make_option("--n_time", type = "integer", default = 100,
+  make_option("--n_time", type = "integer", default = 10,
               help = "number of time points, indexing starts from 0"),
-  make_option("--m", type = "integer", default = 16,
+  make_option("--m", type = "integer", default = 100,
               help = "Number of repetitions per scenario"),
   make_option("--x_blocks", type = "character", default = "33:33:34",
               help = "Segmentation of x coordinate, string gives proportions of the segment lengths"),
@@ -15,7 +15,7 @@ option_list <- list(
               help = "Segmentation of y coordinate, string gives proportions of the segment lengths"),
   make_option("--time_blocks", type = "character", default = "33:33:34",
               help = "Segmentation of time, string gives proportions of the segment lengths"),
-  make_option("--var_nonstationary", type = "logical", default = FALSE,
+  make_option("--var", type = "logical", default = FALSE,
               help = "If true then nonstationarity in variance is also considered in the performance"),
   make_option("--seed_spatial", type = "integer", default = 123,
               help = "Seed for generating spatial locations"),
@@ -69,7 +69,7 @@ simulate <- function(i, coords, a) {
   sigma5 <- 1
 
   # Compute latent components
-  n_nonstationary <- ifelse(opt$var_nonstationary, 4, 3)
+  n_nonstationary <- ifelse(opt$var, 4, 3)
   n_comp <- 5
   latent <- coords %>%
     mutate(
@@ -128,12 +128,13 @@ simulate <- function(i, coords, a) {
   # Compute unmixing matrix
   w <- t(eigen(mean_var)$vectors) %*% cov_p_inv_sqrt
   w_nonstationary <- w[1:n_nonstationary, ]
-  w_stationary <- w[(n_nonstationary + 1):n_comp, ]
+  w_stationary <- w[(n_nonstationary + 1):n_comp, , drop = FALSE]
 
   # Compute performance indices
   a_inv <- solve(a)
   a_inv_proj_nonstat <- LDRTools::B2P(t(a_inv[1:n_nonstationary, ]))
-  a_inv_proj_stat <- LDRTools::B2P(t(a_inv[(n_nonstationary + 1):n_comp, ]))
+  a_inv_proj_stat <- LDRTools::B2P(t(a_inv[(n_nonstationary + 1):n_comp, ,
+                                           drop = FALSE]))
   w_proj_nonstat <- LDRTools::B2P(t(w_nonstationary))
   w_proj_stat <- LDRTools::B2P(t(w_stationary))
   ind_stat <- LDRTools::Pdist(list(a_inv_proj_stat, w_proj_stat),
@@ -173,10 +174,11 @@ colnames(eigenval) <- paste0("f", 1:5)
 # Save results
 filename <- paste0("n_spatial_", opt$n_spatial,
                    "_n_time_", opt$n_time,
+                   "_m_", opt$m,
                    "_x_blocks_", opt$x_blocks,
                    "_y_blocks_", opt$y_blocks,
                    "_time_blocks_", opt$time_blocks,
-                   "_var_nonstationary_", opt$var_nonstationary,
+                   "_var_", opt$var,
                    "_seed_spatial_", opt$seed_spatial,
                    "_seed_sim_", opt$seed_sim, ".csv")
 
