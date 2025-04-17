@@ -24,13 +24,25 @@ First, the purpose of each script is explained:
 - `gen-arg.R` - Generate arguments for simulation settings
 - `test-gen_field_cluster.R` - Unit test for the function `gen_field_cluster()`
 
-First generate arguments by
+Then, generate arguments by
 
 ```
 Rscript gen-arg.R
 ```
 
-After this, corresponding scenarios can be run with
+Also, make directories `results/eigen` and `results/perf` by
+```
+mkdir results
+cd results
+mkdir eigen
+mkdir perf
+```
+
+After this, corresponding scenarios can be run with (in the root directory of
+the project)
 ```
 bash sim-batch.sh
 ```
+
+Simulation results corresponding to each scenario are saved in the directory
+`results/`.
