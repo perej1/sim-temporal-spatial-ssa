@@ -28,6 +28,14 @@ opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 
 
+#' Perform ith repetition of the setting
+#'
+#' @param i Repetition i of the simulation setting
+#' @param coords Spatio-temporal coordinates
+#' @param a The mixing matrix
+#'
+#' @returns A list of length 2: eigenvalues and performance indices for
+#'   stationary and nonstationary subspaces
 simulate <- function(i, coords, a) {
   # Nonstationary latent component 1
   # - Nonstationary in time and space
