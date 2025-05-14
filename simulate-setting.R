@@ -5,7 +5,7 @@ source("functions.R")
 option_list <- list(
   make_option("--n_spatial", type = "integer", default = 100,
               help = "Number of spatial locations at each time point"),
-  make_option("--n_time", type = "integer", default = 100,
+  make_option("--n_time", type = "integer", default = 1000,
               help = "number of time points, indexing starts from 0"),
   make_option("--m", type = "integer", default = 100,
               help = "Number of repetitions per scenario"),
@@ -37,14 +37,16 @@ opt <- parse_args(opt_parser)
 #' @returns A list of length 2: eigenvalues and performance indices for
 #'   stationary and nonstationary subspaces
 simulate <- function(i, coords, a) {
+  sigma <- 5
+  
   # Nonstationary latent component 1
   # - Nonstationary in time and space
   # - Oscillating mean
   x_prop1 <- c(50, 50)
   y_prop1 <- 100
   time_prop1 <- c(50, 50)
-  mu1 <- c(1, -1, 1, -1)
-  sigma1 <- rep(1, 4)
+  mu1 <- c(5, -5, 5, -5)
+  sigma1 <- rep(sigma, 4)
 
   # Nonstationary latent component 2
   # - Only nonstationary in time wrt mean
@@ -52,7 +54,7 @@ simulate <- function(i, coords, a) {
   y_prop2 <- 100
   time_prop2 <- c(10, 20, 30, 40)
   mu2 <- 1:4
-  sigma2 <- rep(1, 4)
+  sigma2 <- rep(sigma, 4)
 
   # Nonstationary latent component 3
   # - Only nonstationary in space wrt mean
@@ -60,7 +62,7 @@ simulate <- function(i, coords, a) {
   y_prop3 <- c(10, 30, 60)
   time_prop3 <- 100
   mu3 <- 1:6
-  sigma3 <- rep(1, 6)
+  sigma3 <- rep(sigma, 6)
 
   # Nonstationary latent component 4
   # - Nonstationary in time and space wrt variance but not wrt mean
@@ -68,7 +70,7 @@ simulate <- function(i, coords, a) {
   y_prop4 <- c(50, 50)
   time_prop4 <- c(50, 50)
   mu4 <- rep(0, 8)
-  sigma4 <- if (opt$include_var_nonstationary) 2^(0:7) else rep(1, 8)
+  sigma4 <- if (opt$include_var_nonstationary) 2^(0:7) else rep(sigma, 8)
 
   # Stationary component 5
   # - Mean and variance do not change
@@ -76,7 +78,7 @@ simulate <- function(i, coords, a) {
   y_prop5 <- 100
   time_prop5 <- 100
   mu5 <- -10
-  sigma5 <- 1
+  sigma5 <- sigma
 
   # Compute latent components
   latent <- coords %>%
@@ -143,7 +145,8 @@ simulate <- function(i, coords, a) {
 
   # Compute performance indices
   a_inv <- solve(a)
-  a_inv_proj_nonstat <- LDRTools::B2P(t(a_inv[1:n_nonstationary, ]))
+  a_inv_proj_nonstat <- LDRTools::B2P(t(a_inv[1:n_nonstationary, ,
+                                              drop = FALSE]))
   a_inv_proj_stat <- LDRTools::B2P(t(a_inv[(n_nonstationary + 1):n_comp, ,
                                            drop = FALSE]))
   w_proj_nonstat <- LDRTools::B2P(t(w_nonstationary))
@@ -181,6 +184,8 @@ res <- parallel::mclapply(1:opt$m, simulate, coords = coords, a = a,
 performance <- do.call(rbind, res$performance)
 eigenval <- do.call(rbind, res$mean_var_eigen_values)
 colnames(eigenval) <- paste0("f", 1:5)
+
+colMeans(performance)
 
 # Save results
 filename <- paste0("n_spatial_", opt$n_spatial,
