@@ -5,18 +5,20 @@ source("functions.R")
 option_list <- list(
   make_option("--n_spatial", type = "integer", default = 100,
               help = "Number of spatial locations at each time point"),
-  make_option("--n_time", type = "integer", default = 1000,
+  make_option("--n_time", type = "integer", default = 100,
               help = "number of time points, indexing starts from 0"),
   make_option("--m", type = "integer", default = 100,
               help = "Number of repetitions per scenario"),
-  make_option("--x_blocks", type = "character", default = "33:33:34",
+  make_option("--x_blocks", type = "character", default = "100",
               help = "Segmentation of x coordinate, string gives proportions of the segment lengths"),
-  make_option("--y_blocks", type = "character", default = "33:33:34",
+  make_option("--y_blocks", type = "character", default = "50:50",
               help = "Segmentation of y coordinate, string gives proportions of the segment lengths"),
-  make_option("--time_blocks", type = "character", default = "33:33:34",
+  make_option("--time_blocks", type = "character", default = "50:50",
               help = "Segmentation of time, string gives proportions of the segment lengths"),
   make_option("--include_var_nonstationary", type = "logical", default = FALSE,
               help = "If true then variance of the fourth component is nonstationary"),
+  make_option("--dim", type = "integer", default = 5,
+              help = "Number of components"),
   make_option("--dim_nonstationary", type = "integer", default = 3,
               help = "Dimension of the nonstationary subspace"),
   make_option("--seed_spatial", type = "integer", default = 123,
@@ -37,23 +39,23 @@ opt <- parse_args(opt_parser)
 #' @returns A list of length 2: eigenvalues and performance indices for
 #'   stationary and nonstationary subspaces
 simulate <- function(i, coords, a) {
-  sigma <- 5
+  sigma <- 10
   
   # Nonstationary latent component 1
   # - Nonstationary in time and space
   # - Oscillating mean
   x_prop1 <- c(50, 50)
-  y_prop1 <- 100
+  y_prop1 <- c(50, 50)
   time_prop1 <- c(50, 50)
-  mu1 <- c(5, -5, 5, -5)
-  sigma1 <- rep(sigma, 4)
+  mu1 <- c(5, 5, -5, -5, 5, 5, -5, -5)
+  sigma1 <- rep(sigma, 8)
 
   # Nonstationary latent component 2
   # - Only nonstationary in time wrt mean
   x_prop2 <- 100
   y_prop2 <- 100
   time_prop2 <- c(10, 20, 30, 40)
-  mu2 <- 1:4
+  mu2 <- c(-10, -200, 500, 100)
   sigma2 <- rep(sigma, 4)
 
   # Nonstationary latent component 3
@@ -61,7 +63,7 @@ simulate <- function(i, coords, a) {
   x_prop3 <- c(10, 90)
   y_prop3 <- c(10, 30, 60)
   time_prop3 <- 100
-  mu3 <- 1:6
+  mu3 <- c(-10, -200, -500, 500, 100, 200)
   sigma3 <- rep(sigma, 6)
 
   # Nonstationary latent component 4
@@ -70,15 +72,15 @@ simulate <- function(i, coords, a) {
   y_prop4 <- c(50, 50)
   time_prop4 <- c(50, 50)
   mu4 <- rep(0, 8)
-  sigma4 <- if (opt$include_var_nonstationary) 2^(0:7) else rep(sigma, 8)
+  sigma4 <- if (opt$include_var_nonstationary) 2^(0:7) else rep(1, 8)
 
   # Stationary component 5
   # - Mean and variance do not change
   x_prop5 <- 100
   y_prop5 <- 100
   time_prop5 <- 100
-  mu5 <- -10
-  sigma5 <- sigma
+  mu5 <- 0
+  sigma5 <- 1
 
   # Compute latent components
   latent <- coords %>%
@@ -140,36 +142,33 @@ simulate <- function(i, coords, a) {
 
   # Compute unmixing matrix
   w <- t(eigen(mean_var)$vectors) %*% cov_p_inv_sqrt
-  w_nonstationary <- w[1:n_nonstationary, ]
+  w_nonstationary <- w[1:n_nonstationary, , drop = FALSE]
   w_stationary <- w[(n_nonstationary + 1):n_comp, , drop = FALSE]
 
   # Compute performance indices
   a_inv <- solve(a)
+  a_inv_proj <- LDRTools::B2P(t(a_inv))
   a_inv_proj_nonstat <- LDRTools::B2P(t(a_inv[1:n_nonstationary, ,
                                               drop = FALSE]))
   a_inv_proj_stat <- LDRTools::B2P(t(a_inv[(n_nonstationary + 1):n_comp, ,
                                            drop = FALSE]))
+  w_proj <- LDRTools::B2P(t(w))
   w_proj_nonstat <- LDRTools::B2P(t(w_nonstationary))
   w_proj_stat <- LDRTools::B2P(t(w_stationary))
+  ind <- LDRTools::Pdist(list(a_inv_proj, w_proj), weights = "constant")
   ind_stat <- LDRTools::Pdist(list(a_inv_proj_stat, w_proj_stat),
                               weights = "constant")
   ind_nonstat <- LDRTools::Pdist(list(a_inv_proj_nonstat, w_proj_nonstat),
                                  weights = "constant")
 
-  res <- list(c(stationary = ind_stat, nonstationary = ind_nonstat),
+  res <- list(c(stationary = ind_stat, nonstationary = ind_nonstat, total = ind),
               eigen_val = eigen(mean_var)$values)
   names(res) <- c("performance", "mean_var_eigen_values")
   res
 }
 
-
-# Set mixing matrix and spatio-temporal coordinates
-a <- c(88, 6, 30, 70, 39,
-       74, 46, 72, 56, 65,
-       10, 12, 53, 96, 93,
-       49, 62, 63, 77, 92,
-       59, 7, 57, 96, 23) %>%
-  matrix(ncol = 5, byrow = TRUE)
+a <- diag(opt$dim)
+  
 coords <- gen_coords(opt$n_spatial, opt$n_time, opt$seed_spatial)
 
 # Perform m repetitions fo the scenario
@@ -183,9 +182,7 @@ res <- parallel::mclapply(1:opt$m, simulate, coords = coords, a = a,
 # Collect results in a matrix (one row corresponds to one repetition)
 performance <- do.call(rbind, res$performance)
 eigenval <- do.call(rbind, res$mean_var_eigen_values)
-colnames(eigenval) <- paste0("f", 1:5)
-
-colMeans(performance)
+colnames(eigenval) <- paste0("f", 1:opt$dim)
 
 # Save results
 filename <- paste0("n_spatial_", opt$n_spatial,
@@ -195,6 +192,7 @@ filename <- paste0("n_spatial_", opt$n_spatial,
                    "_y_blocks_", opt$y_blocks,
                    "_time_blocks_", opt$time_blocks,
                    "_include_var_nonstationary_", opt$include_var_nonstationary,
+                   "_dim_", opt$dim,
                    "_dim_nonstationary_", opt$dim_nonstationary,
                    "_seed_spatial_", opt$seed_spatial,
                    "_seed_sim_", opt$seed_sim, ".csv")

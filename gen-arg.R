@@ -1,12 +1,13 @@
 # Generate arguments
 
-n_spatial <- c(10, 100)
-n_time <- c(10, 100)
+n_spatial <- c(10, 50, 100, 500)
+n_time <- c(10, 50, 100, 500)
 m <- 100
 x_blocks <- c("33:33:34")
 y_blocks <- c("33:33:34")
 time_blocks <- c("33:33:34")
 include_var_nonstationary <- c(FALSE, TRUE)
+dim <- 5
 dim_nonstationary <- c(3, 4)
 seed_spatial <- 123
 seed_sim <- 321
@@ -19,6 +20,7 @@ arg <- expand.grid(
   y_blocks = y_blocks,
   time_blocks = time_blocks,
   include_var_nonstationary = include_var_nonstationary,
+  dim = dim,
   dim_nonstationary = dim_nonstationary,
   seed_spatial = seed_spatial,
   seed_sim = seed_sim
@@ -27,8 +29,8 @@ arg <- expand.grid(
 arg_vector <- sprintf(paste0("simulate-setting.R --n_spatial %d --n_time %d ",
                              "--m %d --x_blocks %s --y_blocks %s ",
                              "--time_blocks %s --include_var_nonstationary %s ",
-                             "--dim_nonstationary %d --seed_spatial %d ",
-                             "--seed_sim %d"),
+                             "--dim %d --dim_nonstationary %d ",
+                             "--seed_spatial %d --seed_sim %d"),
   arg$n_spatial,
   arg$n_time,
   arg$m,
@@ -36,6 +38,7 @@ arg_vector <- sprintf(paste0("simulate-setting.R --n_spatial %d --n_time %d ",
   arg$y_blocks,
   arg$time_blocks,
   arg$include_var_nonstationary,
+  arg$dim,
   arg$dim_nonstationary,
   arg$seed_spatial,
   arg$seed_sim
