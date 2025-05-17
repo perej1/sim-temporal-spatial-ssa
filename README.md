@@ -15,16 +15,18 @@ Simulations for an article about (non)stationary subspace analysis for temporal 
 
 ## Running the Simulation
 
-First, the purpose of each script is explained:
+Below, the purpose of each script is explained:
 
 - `simulate-setting.R` - Perform simulation for a selected setting
+- `summarise.R` - Summarise results by plotting boxplots
 - `sim-batch.sh` - Run a batch of simulations settings with different
+- `summarise-batch.sh` - Run `summarise.R` with selected parameters
   parameters
 - `functions.R` - Global functions
 - `gen-arg.R` - Generate arguments for simulation settings
 - `test-gen_field_cluster.R` - Unit test for the function `gen_field_cluster()`
 
-Then, generate arguments by
+Generate arguments by
 
 ```
 Rscript gen-arg.R
@@ -43,6 +45,12 @@ the project)
 ```
 bash sim-batch.sh
 ```
-
 Simulation results corresponding to each scenario are saved in the directory
 `results/`.
+
+
+For plotting make directories `plots/stationary/` and `plots/nonstationary/`.
+Then plots can be produced with
+```
+bash summarise-batch.sh
+```
