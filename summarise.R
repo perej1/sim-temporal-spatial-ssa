@@ -10,7 +10,7 @@ option_list <- list(
               help = "Spatial sample sizes"),
   make_option("--n_time", type = "character", default = "50:10",
               help = "Temporal sample sizes")
-  )
+)
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 
@@ -18,7 +18,6 @@ n_spatial_arg <- as.integer(stringr::str_split_1(opt$n_spatial, ":"))
 n_time_arg <- as.integer(stringr::str_split_1(opt$n_time, ":"))
 
 args <- readr::read_csv("sim-args.csv", col_types = "iiicccliiii")
-str(args)
 
 # Check that given arguments are valid
 if (length(n_spatial_arg) != length(n_time_arg)) {
