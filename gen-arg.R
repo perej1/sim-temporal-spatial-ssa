@@ -26,11 +26,12 @@ arg <- expand.grid(
   seed_sim = seed_sim
 )
 
-arg_vector <- sprintf(paste0("simulate-setting.R --n_spatial %d --n_time %d ",
-                             "--m %d --x_blocks %s --y_blocks %s ",
-                             "--time_blocks %s --include_var_nonstationary %s ",
-                             "--dim %d --dim_nonstationary %d ",
-                             "--seed_spatial %d --seed_sim %d"),
+arg_vector <- sprintf(stringr::str_c("simulate-setting.R --n_spatial %d ",
+                                     "--n_time %d --m %d --x_blocks %s ",
+                                     "--y_blocks %s --time_blocks %s ",
+                                     "--include_var_nonstationary %s ",
+                                     "--dim %d --dim_nonstationary %d ",
+                                     "--seed_spatial %d --seed_sim %d"),
   arg$n_spatial,
   arg$n_time,
   arg$m,

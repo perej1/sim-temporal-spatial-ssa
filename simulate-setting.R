@@ -12,13 +12,17 @@ option_list <- list(
   make_option("--m", type = "integer", default = 100,
               help = "Number of repetitions per scenario"),
   make_option("--x_blocks", type = "character", default = "100",
-              help = "Segmentation of x coordinate, string gives proportions of the segment lengths"),
+              help = stringr::str_c("Segmentation of x coord, string gives ",
+                                    "proportions of the segment lengths")),
   make_option("--y_blocks", type = "character", default = "50:50",
-              help = "Segmentation of y coordinate, string gives proportions of the segment lengths"),
+              help = stringr::str_c("Segmentation of y coord, string gives ",
+                                    "proportions of the segment lengths")),
   make_option("--time_blocks", type = "character", default = "50:50",
-              help = "Segmentation of time, string gives proportions of the segment lengths"),
+              help = stringr::str_c("Segmentation of time, string gives ",
+                                    "proportions of the segment lengths")),
   make_option("--include_var_nonstationary", type = "logical", default = FALSE,
-              help = "If true then variance of the fourth component is nonstationary"),
+              help = stringr::str_c("If true then variance of the fourth ",
+                                    "component is nonstationary")),
   make_option("--dim", type = "integer", default = 5,
               help = "Number of components"),
   make_option("--dim_nonstationary", type = "integer", default = 3,
@@ -41,7 +45,7 @@ opt <- parse_args(opt_parser)
 #' @returns A list of length 2: eigenvalues and performance indices for
 #'   stationary and nonstationary subspaces
 simulate <- function(i, coords, a) {
-  
+
   # Nonstationary latent component 1
   # - Nonstationary in time and space
   # - Oscillating mean
@@ -96,7 +100,6 @@ simulate <- function(i, coords, a) {
     sf::st_drop_geometry()
 
   n_nonstationary <- opt$dim_nonstationary
-  n_comp <- ncol(latent)
 
   # Compute observed field
   observed <- latent %>%
@@ -112,7 +115,7 @@ simulate <- function(i, coords, a) {
     apply(1, function(x) cov_p_inv_sqrt %*% matrix(x, ncol = 1)) %>%
     t() %>%
     as_tibble(.name_repair = "minimal")
-  colnames(whitened) <- paste0("f", 1:n_comp)
+  colnames(whitened) <- stringr::str_c("f", 1:opt$dim)
 
   # Parse cut points
   x_prop <- stringr::str_split(opt$x_blocks, ":", simplify = TRUE) %>%
@@ -144,14 +147,14 @@ simulate <- function(i, coords, a) {
   # Compute unmixing matrix
   w <- t(eigen(mean_var)$vectors) %*% cov_p_inv_sqrt
   w_nonstationary <- w[1:n_nonstationary, , drop = FALSE]
-  w_stationary <- w[(n_nonstationary + 1):n_comp, , drop = FALSE]
+  w_stationary <- w[(n_nonstationary + 1):opt$dim, , drop = FALSE]
 
   # Compute performance indices
   a_inv <- solve(a)
   a_inv_proj <- LDRTools::B2P(t(a_inv))
   a_inv_proj_nonstat <- LDRTools::B2P(t(a_inv[1:n_nonstationary, ,
                                               drop = FALSE]))
-  a_inv_proj_stat <- LDRTools::B2P(t(a_inv[(n_nonstationary + 1):n_comp, ,
+  a_inv_proj_stat <- LDRTools::B2P(t(a_inv[(n_nonstationary + 1):opt$dim, ,
                                            drop = FALSE]))
   w_proj <- LDRTools::B2P(t(w))
   w_proj_nonstat <- LDRTools::B2P(t(w_nonstationary))
@@ -162,14 +165,15 @@ simulate <- function(i, coords, a) {
   ind_nonstat <- LDRTools::Pdist(list(a_inv_proj_nonstat, w_proj_nonstat),
                                  weights = "constant")
 
-  res <- list(c(stationary = ind_stat, nonstationary = ind_nonstat, total = ind),
+  res <- list(c(stationary = ind_stat, nonstationary = ind_nonstat,
+                total = ind),
               eigen_val = eigen(mean_var)$values)
   names(res) <- c("performance", "mean_var_eigen_values")
   res
 }
 
 # Set mixing matrix
-repeat{
+repeat {
   a <- matrix(runif(opt$dim^2, min = -1, max = 1), ncol = opt$dim)
   if (is.matrix(try(solve(a), silent = TRUE))) {
     break
@@ -190,23 +194,24 @@ res <- parallel::mclapply(1:opt$m, simulate, coords = coords, a = a,
 # Collect results in a matrix (one row corresponds to one repetition)
 performance <- do.call(rbind, res$performance)
 eigenval <- do.call(rbind, res$mean_var_eigen_values)
-colnames(eigenval) <- paste0("f", 1:opt$dim)
+colnames(eigenval) <- stringr::str_c("f", 1:opt$dim)
 
 # Save results
-filename <- paste0("n_spatial_", opt$n_spatial,
-                   "_n_time_", opt$n_time,
-                   "_m_", opt$m,
-                   "_x_blocks_", opt$x_blocks,
-                   "_y_blocks_", opt$y_blocks,
-                   "_time_blocks_", opt$time_blocks,
-                   "_include_var_nonstationary_", opt$include_var_nonstationary,
-                   "_dim_", opt$dim,
-                   "_dim_nonstationary_", opt$dim_nonstationary,
-                   "_seed_spatial_", opt$seed_spatial,
-                   "_seed_sim_", opt$seed_sim, ".csv")
+filename <- stringr::str_c("n_spatial_", opt$n_spatial,
+                           "_n_time_", opt$n_time,
+                           "_m_", opt$m,
+                           "_x_blocks_", opt$x_blocks,
+                           "_y_blocks_", opt$y_blocks,
+                           "_time_blocks_", opt$time_blocks,
+                           "_include_var_nonstationary_",
+                           opt$include_var_nonstationary,
+                           "_dim_", opt$dim,
+                           "_dim_nonstationary_", opt$dim_nonstationary,
+                           "_seed_spatial_", opt$seed_spatial,
+                           "_seed_sim_", opt$seed_sim, ".csv")
 
 tibble::as_tibble(performance) %>%
-  readr::write_csv(paste0("results/perf/", filename))
+  readr::write_csv(stringr::str_c("results/perf/", filename))
 
 tibble::as_tibble(eigenval) %>%
-  readr::write_csv(paste0("results/eigen/", filename))
+  readr::write_csv(stringr::str_c("results/eigen/", filename))
