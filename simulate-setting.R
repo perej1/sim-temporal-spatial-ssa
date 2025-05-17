@@ -44,7 +44,15 @@ opt <- parse_args(opt_parser)
 #'
 #' @returns A list of length 2: eigenvalues and performance indices for
 #'   stationary and nonstationary subspaces
-simulate <- function(i, coords, a) {
+simulate <- function(i, coords) {
+
+  # Set mixing matrix
+  repeat {
+    a <- matrix(runif(opt$dim^2, min = -1, max = 1), ncol = opt$dim)
+    if (is.matrix(try(solve(a), silent = TRUE))) {
+      break
+    }
+  }
 
   # Nonstationary latent component 1
   # - Nonstationary in time and space
@@ -172,21 +180,13 @@ simulate <- function(i, coords, a) {
   res
 }
 
-# Set mixing matrix
-repeat {
-  a <- matrix(runif(opt$dim^2, min = -1, max = 1), ncol = opt$dim)
-  if (is.matrix(try(solve(a), silent = TRUE))) {
-    break
-  }
-}
-
 # Set spatial locations
 coords <- gen_coords(opt$n_spatial, opt$n_time, opt$seed_spatial)
 
 # Perform m repetitions fo the scenario
 RNGkind("L'Ecuyer-CMRG")
 set.seed(opt$seed_sim)
-res <- parallel::mclapply(1:opt$m, simulate, coords = coords, a = a,
+res <- parallel::mclapply(1:opt$m, simulate, coords = coords,
                           mc.set.seed = TRUE,
                           mc.cores = parallel::detectCores()) %>%
   purrr::transpose()
