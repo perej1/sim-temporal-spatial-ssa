@@ -41,7 +41,6 @@ opt <- parse_args(opt_parser)
 #' @returns A list of length 2: eigenvalues and performance indices for
 #'   stationary and nonstationary subspaces
 simulate <- function(i, coords, a) {
-  sigma <- 10
   
   # Nonstationary latent component 1
   # - Nonstationary in time and space
@@ -50,7 +49,7 @@ simulate <- function(i, coords, a) {
   y_prop1 <- c(50, 50)
   time_prop1 <- c(50, 50)
   mu1 <- c(5, 5, -5, -5, 5, 5, -5, -5)
-  sigma1 <- rep(sigma, 8)
+  sigma1 <- rep(1, 8)
 
   # Nonstationary latent component 2
   # - Only nonstationary in time wrt mean
@@ -58,7 +57,7 @@ simulate <- function(i, coords, a) {
   y_prop2 <- 100
   time_prop2 <- c(10, 20, 30, 40)
   mu2 <- c(-10, -200, 500, 100)
-  sigma2 <- rep(sigma, 4)
+  sigma2 <- rep(1, 4)
 
   # Nonstationary latent component 3
   # - Only nonstationary in space wrt mean
@@ -66,7 +65,7 @@ simulate <- function(i, coords, a) {
   y_prop3 <- c(10, 30, 60)
   time_prop3 <- 100
   mu3 <- c(-10, -200, -500, 500, 100, 200)
-  sigma3 <- rep(sigma, 6)
+  sigma3 <- rep(1, 6)
 
   # Nonstationary latent component 4
   # - Nonstationary in time and space wrt variance but not wrt mean
@@ -169,8 +168,15 @@ simulate <- function(i, coords, a) {
   res
 }
 
-a <- diag(opt$dim)
-  
+# Set mixing matrix
+repeat{
+  a <- matrix(runif(opt$dim^2, min = -1, max = 1), ncol = opt$dim)
+  if (is.matrix(try(solve(a), silent = TRUE))) {
+    break
+  }
+}
+
+# Set spatial locations
 coords <- gen_coords(opt$n_spatial, opt$n_time, opt$seed_spatial)
 
 # Perform m repetitions fo the scenario
