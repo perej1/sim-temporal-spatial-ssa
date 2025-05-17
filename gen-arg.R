@@ -1,11 +1,11 @@
 # Generate arguments
 
-n_spatial <- c(10, 50, 100, 500)
-n_time <- c(10, 50, 100, 500)
+n_spatial <- c(10, 50, 100, 500, 1000)
+n_time <- c(10, 50, 100, 500, 1000)
 m <- 100
-x_blocks <- c("33:33:34")
-y_blocks <- c("33:33:34")
-time_blocks <- c("33:33:34")
+x_blocks <- c("33:33:34", "50:50", "100")
+y_blocks <- c("33:33:34", "50:50", "100")
+time_blocks <- c("33:33:34", "50:50", "100")
 include_var_nonstationary <- c(FALSE, TRUE)
 dim <- 5
 dim_nonstationary <- c(3, 4)
