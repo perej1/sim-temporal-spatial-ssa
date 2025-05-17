@@ -1,3 +1,5 @@
+# Perform m rounds of simulations for a particular setting
+
 library(optparse)
 source("functions.R")
 

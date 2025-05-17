@@ -1,4 +1,5 @@
 # Functions for the simulations
+
 suppressMessages(library(dplyr))
 
 #' Compute negative square root of a positive definite matrix
