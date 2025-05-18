@@ -5,19 +5,19 @@ source("functions.R")
 
 
 option_list <- list(
-  make_option("--n_spatial", type = "integer", default = 100,
+  make_option("--n_spatial", type = "integer", default = 1000,
               help = "Number of spatial locations at each time point"),
-  make_option("--n_time", type = "integer", default = 100,
+  make_option("--n_time", type = "integer", default = 1000,
               help = "number of time points, indexing starts from 0"),
   make_option("--m", type = "integer", default = 100,
               help = "Number of repetitions per scenario"),
-  make_option("--x_blocks", type = "character", default = "100",
+  make_option("--x_blocks", type = "character", default = "33:33:34",
               help = stringr::str_c("Segmentation of x coord, string gives ",
                                     "proportions of the segment lengths")),
-  make_option("--y_blocks", type = "character", default = "50:50",
+  make_option("--y_blocks", type = "character", default = "33:33:34",
               help = stringr::str_c("Segmentation of y coord, string gives ",
                                     "proportions of the segment lengths")),
-  make_option("--time_blocks", type = "character", default = "50:50",
+  make_option("--time_blocks", type = "character", default = "33:33:34",
               help = stringr::str_c("Segmentation of time, string gives ",
                                     "proportions of the segment lengths")),
   make_option("--include_var_nonstationary", type = "logical", default = FALSE,
@@ -67,17 +67,17 @@ simulate <- function(i, coords) {
   # - Only nonstationary in time wrt mean
   x_prop2 <- 100
   y_prop2 <- 100
-  time_prop2 <- c(10, 20, 30, 40)
-  mu2 <- c(-10, -200, 500, 100)
-  sigma2 <- rep(1, 4)
+  time_prop2 <- c(33, 33, 34)
+  mu2 <- c(-10, -20, 0)
+  sigma2 <- rep(1, 3)
 
   # Nonstationary latent component 3
   # - Only nonstationary in space wrt mean
-  x_prop3 <- c(10, 90)
-  y_prop3 <- c(10, 30, 60)
+  x_prop3 <- c(25, 25, 25, 25)
+  y_prop3 <- 100
   time_prop3 <- 100
-  mu3 <- c(-10, -200, -500, 500, 100, 200)
-  sigma3 <- rep(1, 6)
+  mu3 <- c(10, 0, 20, 0)
+  sigma3 <- rep(1, 4)
 
   # Nonstationary latent component 4
   # - Nonstationary in time and space wrt variance but not wrt mean
