@@ -1,13 +1,17 @@
-# Perform m rounds of simulations for a particular setting
+# Perform m rounds of simulations for a particular setting. On each
+# round i = 1, ..., m, the mixing matrix is different. More precisely, elements
+# of the mixing matrix are generated from uniform distribution on [-1, 1].
 
 library(optparse)
 source("functions.R")
 
 
 option_list <- list(
-  make_option("--n_spatial", type = "integer", default = 1000,
+  make_option("--latent", type = "character", default = "spacetime",
+              help = "For different options the latent field is different."),
+  make_option("--n_spatial", type = "integer", default = 100,
               help = "Number of spatial locations at each time point"),
-  make_option("--n_time", type = "integer", default = 1000,
+  make_option("--n_time", type = "integer", default = 100,
               help = "number of time points, indexing starts from 0"),
   make_option("--m", type = "integer", default = 100,
               help = "Number of repetitions per scenario"),
@@ -20,13 +24,6 @@ option_list <- list(
   make_option("--time_blocks", type = "character", default = "33:33:34",
               help = stringr::str_c("Segmentation of time, string gives ",
                                     "proportions of the segment lengths")),
-  make_option("--include_var_nonstationary", type = "logical", default = FALSE,
-              help = stringr::str_c("If true then variance of the fourth ",
-                                    "component is nonstationary")),
-  make_option("--dim", type = "integer", default = 5,
-              help = "Number of components"),
-  make_option("--dim_nonstationary", type = "integer", default = 3,
-              help = "Dimension of the nonstationary subspace"),
   make_option("--seed_spatial", type = "integer", default = 123,
               help = "Seed for generating spatial locations"),
   make_option("--seed_sim", type = "integer", default = 321,
@@ -35,12 +32,14 @@ option_list <- list(
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 
+# We always have four components, 2 nonstationary ones
+dim <- 4
+dim_nonstationary <- 2
 
 #' Perform ith repetition of the setting
 #'
 #' @param i Repetition i of the simulation setting
 #' @param coords Spatio-temporal coordinates
-#' @param a The mixing matrix
 #'
 #' @returns A list of length 2: eigenvalues and performance indices for
 #'   stationary and nonstationary subspaces
@@ -48,66 +47,36 @@ simulate <- function(i, coords) {
 
   # Set mixing matrix
   repeat {
-    a <- matrix(runif(opt$dim^2, min = -1, max = 1), ncol = opt$dim)
+    a <- matrix(runif(dim^2, min = -1, max = 1), ncol = dim)
     if (is.matrix(try(solve(a), silent = TRUE))) {
       break
     }
   }
 
-  # Nonstationary latent component 1
-  # - Nonstationary in time and space
-  # - Oscillating mean
-  x_prop1 <- c(50, 50)
-  y_prop1 <- c(50, 50)
-  time_prop1 <- c(50, 50)
-  mu1 <- c(5, 5, -5, -5, 5, 5, -5, -5)
-  sigma1 <- rep(1, 8)
+  # Set latent components
+  if (opt$latent == "spacetime") {
+    f1 <- gen_field_cluster(coords, seq(-20, 30, 10), rep(1, 6), 100, c(50, 50),
+                            c(33, 33, 34))
+    f2 <- gen_field_cluster(coords, seq(-40, 30, 10), rep(1, 8), c(50, 50),
+                            c(50, 50), c(50, 50))
+  } else if (opt$latent == "oscillating") {
+    f1 <- gen_field_cluster(coords, c(5, 5, -5, -5, 5, 5, -5, -5), rep(1, 8),
+                            c(50, 50), c(50, 50), c(50, 50))
+    f2 <- gen_field_cluster(coords, c(5, -5, 5, -5, 5, -5, 5, -5), rep(1, 8),
+                            c(50, 50), c(50, 50), c(50, 50))
+  } else {
+    rlang::abort("Invalid option for the argument --latent.")
+  }
 
-  # Nonstationary latent component 2
-  # - Only nonstationary in time wrt mean
-  x_prop2 <- 100
-  y_prop2 <- 100
-  time_prop2 <- c(33, 33, 34)
-  mu2 <- c(-10, -20, 0)
-  sigma2 <- rep(1, 3)
-
-  # Nonstationary latent component 3
-  # - Only nonstationary in space wrt mean
-  x_prop3 <- c(25, 25, 25, 25)
-  y_prop3 <- 100
-  time_prop3 <- 100
-  mu3 <- c(10, 0, 20, 0)
-  sigma3 <- rep(1, 4)
-
-  # Nonstationary latent component 4
-  # - Nonstationary in time and space wrt variance but not wrt mean
-  x_prop4 <- c(50, 50)
-  y_prop4 <- c(50, 50)
-  time_prop4 <- c(50, 50)
-  mu4 <- rep(0, 8)
-  sigma4 <- if (opt$include_var_nonstationary) 2^(0:7) else rep(1, 8)
-
-  # Stationary component 5
-  # - Mean and variance do not change
-  x_prop5 <- 100
-  y_prop5 <- 100
-  time_prop5 <- 100
-  mu5 <- 0
-  sigma5 <- 1
-
-  # Compute latent components
   latent <- coords %>%
     mutate(
-      f1 = gen_field_cluster(., mu1, sigma1, x_prop1, y_prop1, time_prop1),
-      f2 = gen_field_cluster(., mu2, sigma2, x_prop2, y_prop2, time_prop2),
-      f3 = gen_field_cluster(., mu3, sigma3, x_prop3, y_prop3, time_prop3),
-      f4 = gen_field_cluster(., mu4, sigma4, x_prop4, y_prop4, time_prop4),
-      f5 = gen_field_cluster(., mu5, sigma5, x_prop5, y_prop5, time_prop5)
+      f1 = f1,
+      f2 = f2,
+      f4 = gen_field_cluster(., 0, 1, 100, 100, 100),
+      f5 = gen_field_cluster(., 0, 1, 100, 100, 100)
     ) %>%
     sftime::st_drop_time() %>%
     sf::st_drop_geometry()
-
-  n_nonstationary <- opt$dim_nonstationary
 
   # Compute observed field
   observed <- latent %>%
@@ -123,7 +92,7 @@ simulate <- function(i, coords) {
     apply(1, function(x) cov_p_inv_sqrt %*% matrix(x, ncol = 1)) %>%
     t() %>%
     as_tibble(.name_repair = "minimal")
-  colnames(whitened) <- stringr::str_c("f", 1:opt$dim)
+  colnames(whitened) <- stringr::str_c("f", 1:dim)
 
   # Parse cut points
   x_prop <- stringr::str_split(opt$x_blocks, ":", simplify = TRUE) %>%
@@ -154,27 +123,23 @@ simulate <- function(i, coords) {
 
   # Compute unmixing matrix
   w <- t(eigen(mean_var)$vectors) %*% cov_p_inv_sqrt
-  w_nonstationary <- w[1:n_nonstationary, , drop = FALSE]
-  w_stationary <- w[(n_nonstationary + 1):opt$dim, , drop = FALSE]
+  w_nonstationary <- w[1:dim_nonstationary, , drop = FALSE]
+  w_stationary <- w[(dim_nonstationary + 1):dim, , drop = FALSE]
 
   # Compute performance indices
   a_inv <- solve(a)
-  a_inv_proj <- LDRTools::B2P(t(a_inv))
-  a_inv_proj_nonstat <- LDRTools::B2P(t(a_inv[1:n_nonstationary, ,
+  a_inv_proj_nonstat <- LDRTools::B2P(t(a_inv[1:dim_nonstationary, ,
                                               drop = FALSE]))
-  a_inv_proj_stat <- LDRTools::B2P(t(a_inv[(n_nonstationary + 1):opt$dim, ,
+  a_inv_proj_stat <- LDRTools::B2P(t(a_inv[(dim_nonstationary + 1):dim, ,
                                            drop = FALSE]))
-  w_proj <- LDRTools::B2P(t(w))
   w_proj_nonstat <- LDRTools::B2P(t(w_nonstationary))
   w_proj_stat <- LDRTools::B2P(t(w_stationary))
-  ind <- LDRTools::Pdist(list(a_inv_proj, w_proj), weights = "constant")
   ind_stat <- LDRTools::Pdist(list(a_inv_proj_stat, w_proj_stat),
                               weights = "constant")
   ind_nonstat <- LDRTools::Pdist(list(a_inv_proj_nonstat, w_proj_nonstat),
                                  weights = "constant")
 
-  res <- list(c(stationary = ind_stat, nonstationary = ind_nonstat,
-                total = ind),
+  res <- list(c(stationary = ind_stat, nonstationary = ind_nonstat),
               eigen_val = eigen(mean_var)$values)
   names(res) <- c("performance", "mean_var_eigen_values")
   res
@@ -194,19 +159,16 @@ res <- parallel::mclapply(1:opt$m, simulate, coords = coords,
 # Collect results in a matrix (one row corresponds to one repetition)
 performance <- do.call(rbind, res$performance)
 eigenval <- do.call(rbind, res$mean_var_eigen_values)
-colnames(eigenval) <- stringr::str_c("f", 1:opt$dim)
+colnames(eigenval) <- stringr::str_c("f", 1:dim)
 
 # Save results
-filename <- stringr::str_c("n_spatial_", opt$n_spatial,
+filename <- stringr::str_c("latent_", opt$latent,
+                           "_n_spatial_", opt$n_spatial,
                            "_n_time_", opt$n_time,
                            "_m_", opt$m,
                            "_x_blocks_", opt$x_blocks,
                            "_y_blocks_", opt$y_blocks,
                            "_time_blocks_", opt$time_blocks,
-                           "_include_var_nonstationary_",
-                           opt$include_var_nonstationary,
-                           "_dim_", opt$dim,
-                           "_dim_nonstationary_", opt$dim_nonstationary,
                            "_seed_spatial_", opt$seed_spatial,
                            "_seed_sim_", opt$seed_sim, ".csv")
 
