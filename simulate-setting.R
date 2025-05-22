@@ -7,7 +7,7 @@ source("functions.R")
 
 
 option_list <- list(
-  make_option("--latent", type = "character", default = "spacetime",
+  make_option("--latent", type = "character", default = "oscillating",
               help = "For different options the latent field is different."),
   make_option("--n_spatial", type = "integer", default = 100,
               help = "Number of spatial locations at each time point"),
@@ -24,6 +24,9 @@ option_list <- list(
   make_option("--time_blocks", type = "character", default = "33:33:34",
               help = stringr::str_c("Segmentation of time, string gives ",
                                     "proportions of the segment lengths")),
+  make_option("--random_eigenvect", type = "logical", default = TRUE,
+              help = stringr::str_c("If TRUE random eigenvectors are used in ",
+                                    "the computation of the unmixing matrix")),
   make_option("--seed_spatial", type = "integer", default = 123,
               help = "Seed for generating spatial locations"),
   make_option("--seed_sim", type = "integer", default = 321,
@@ -122,7 +125,13 @@ simulate <- function(i, coords) {
     purrr::reduce(`+`)
 
   # Compute unmixing matrix
-  w <- t(eigen(mean_var)$vectors) %*% cov_p_inv_sqrt
+  if (opt$random_eigenvect) {
+    v_transpose <- pracma::randortho(dim, type = "orthonormal")
+  } else {
+    v_transpose <- t(eigen(mean_var)$vectors)
+  }
+
+  w <- v_transpose %*% cov_p_inv_sqrt
   w_nonstationary <- w[1:dim_nonstationary, , drop = FALSE]
   w_stationary <- w[(dim_nonstationary + 1):dim, , drop = FALSE]
 
@@ -161,6 +170,8 @@ performance <- do.call(rbind, res$performance)
 eigenval <- do.call(rbind, res$mean_var_eigen_values)
 colnames(eigenval) <- stringr::str_c("f", 1:dim)
 
+colMeans(performance)
+
 # Save results
 filename <- stringr::str_c("latent_", opt$latent,
                            "_n_spatial_", opt$n_spatial,
@@ -169,6 +180,7 @@ filename <- stringr::str_c("latent_", opt$latent,
                            "_x_blocks_", opt$x_blocks,
                            "_y_blocks_", opt$y_blocks,
                            "_time_blocks_", opt$time_blocks,
+                           "_random_eigenvect_", opt$random_eigenvect,
                            "_seed_spatial_", opt$seed_spatial,
                            "_seed_sim_", opt$seed_sim, ".csv")
 
