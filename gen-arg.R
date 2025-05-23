@@ -1,46 +1,109 @@
 # Generate arguments
+library(dplyr)
+library(tidyr)
+library(tibble)
 
-n_spatial <- c(10, 50, 100, 500, 1000)
-n_time <- c(10, 50, 100, 500, 1000)
-m <- 100
-x_blocks <- c("33:33:34", "50:50", "100")
-y_blocks <- c("33:33:34", "50:50", "100")
-time_blocks <- c("33:33:34", "50:50", "100")
-include_var_nonstationary <- c(FALSE, TRUE)
-dim <- 5
-dim_nonstationary <- c(3, 4)
-seed_spatial <- 123
-seed_sim <- 321
+seg <- c("100", "50:50", "33:33:34", "25:25:25:25",
+         "10:10:10:10:10:10:10:10:10:10")
 
-arg <- expand.grid(
-  n_spatial = n_spatial,
-  n_time = n_time,
-  m = m,
-  x_blocks = x_blocks,
-  y_blocks = y_blocks,
-  time_blocks = time_blocks,
-  include_var_nonstationary = include_var_nonstationary,
-  dim = dim,
-  dim_nonstationary = dim_nonstationary,
-  seed_spatial = seed_spatial,
-  seed_sim = seed_sim
-)
+# Arguments for latent == "oscillating" when using our method
+osc_method_arg <- tibble(
+  latent = "oscillating",
+  n = list(
+    tibble(n_spatial = 50, n_time = 100),
+    tibble(n_spatial = 100, n_time = 500),
+    tibble(n_spatial = 500, n_time = 1000)
+  ),
+  m = 100,
+  segments = list(
+    tibble(x_blocks = seg[3], y_blocks = seg[3], time_blocks = seg[3]),
+    tibble(x_blocks = seg[2], y_blocks = seg[1], time_blocks = seg[2]),
+    tibble(x_blocks = seg[1], y_blocks = seg[2], time_blocks = seg[2])
+  ),
+  random_eigenvect = FALSE,
+  seed_spatial = 123,
+  seed_sim = 321
+) %>%
+  expand(latent, n, m, segments, random_eigenvect, seed_spatial, seed_sim) %>%
+  unnest(c(n, segments))
 
-arg_vector <- sprintf(stringr::str_c("simulate-setting.R --n_spatial %d ",
-                                     "--n_time %d --m %d --x_blocks %s ",
-                                     "--y_blocks %s --time_blocks %s ",
-                                     "--include_var_nonstationary %s ",
-                                     "--dim %d --dim_nonstationary %d ",
+# Arguments for latent == "oscillating" when using "random" estimate for the
+# unmixing matrix
+osc_random_arg <- tibble(
+  latent = "oscillating",
+  n = list(
+    tibble(n_spatial = 50, n_time = 100),
+    tibble(n_spatial = 100, n_time = 500),
+    tibble(n_spatial = 500, n_time = 1000)
+  ),
+  m = 100,
+  segments = list(
+    tibble(x_blocks = seg[1], y_blocks = seg[1], time_blocks = seg[1])
+  ),
+  random_eigenvect = TRUE,
+  seed_spatial = 123,
+  seed_sim = 321
+) %>%
+  expand(latent, n, m, segments, random_eigenvect, seed_spatial, seed_sim) %>%
+  unnest(c(n, segments))
+
+# Arguments for latent == "spacetime" when using our method
+spacetime_method_arg <- tibble(
+  latent = "spacetime",
+  n = list(
+    tibble(n_spatial = 100, n_time = 500)
+  ),
+  m = 100,
+  segments = list(
+    tibble(x_blocks = seg[1], y_blocks = seg[2], time_blocks = seg[2]),
+    tibble(x_blocks = seg[2], y_blocks = seg[1], time_blocks = seg[2]),
+    tibble(x_blocks = seg[2], y_blocks = seg[2], time_blocks = seg[1]),
+    tibble(x_blocks = seg[2], y_blocks = seg[2], time_blocks = seg[2]),
+    tibble(x_blocks = seg[3], y_blocks = seg[3], time_blocks = seg[3]),
+    tibble(x_blocks = seg[4], y_blocks = seg[4], time_blocks = seg[4]),
+    tibble(x_blocks = seg[5], y_blocks = seg[5], time_blocks = seg[5])
+  ),
+  random_eigenvect = FALSE,
+  seed_spatial = 123,
+  seed_sim = 321
+) %>%
+  expand(latent, n, m, segments, random_eigenvect, seed_spatial, seed_sim) %>%
+  unnest(c(n, segments))
+
+# Arguments for latent == "spacetime" when using "random" estimate for the
+# unmixing matrix
+spacetime_random_arg <- tibble(
+  latent = "spacetime",
+  n = list(
+    tibble(n_spatial = 100, n_time = 500)
+  ),
+  m = 100,
+  segments = list(
+    tibble(x_blocks = seg[1], y_blocks = seg[1], time_blocks = seg[1])
+  ),
+  random_eigenvect = TRUE,
+  seed_spatial = 123,
+  seed_sim = 321
+) %>%
+  expand(latent, n, m, segments, random_eigenvect, seed_spatial, seed_sim) %>%
+  unnest(c(n, segments))
+
+arg <- bind_rows(osc_method_arg, osc_random_arg, spacetime_method_arg,
+                 spacetime_random_arg)
+
+arg_vector <- sprintf(stringr::str_c("simulate-setting.R --latent %s ",
+                                     "--n_spatial %d --n_time %d --m %d ",
+                                     "--x_blocks %s --y_blocks %s ",
+                                     "--time_blocks %s --random_eigenvect %s ",
                                      "--seed_spatial %d --seed_sim %d"),
+  arg$latent,
   arg$n_spatial,
   arg$n_time,
   arg$m,
   arg$x_blocks,
   arg$y_blocks,
   arg$time_blocks,
-  arg$include_var_nonstationary,
-  arg$dim,
-  arg$dim_nonstationary,
+  arg$random_eigenvect,
   arg$seed_spatial,
   arg$seed_sim
 )
