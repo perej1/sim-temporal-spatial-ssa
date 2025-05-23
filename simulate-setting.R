@@ -170,8 +170,6 @@ performance <- do.call(rbind, res$performance)
 eigenval <- do.call(rbind, res$mean_var_eigen_values)
 colnames(eigenval) <- stringr::str_c("f", 1:dim)
 
-colMeans(performance)
-
 # Save results
 filename <- stringr::str_c("latent_", opt$latent,
                            "_n_spatial_", opt$n_spatial,
