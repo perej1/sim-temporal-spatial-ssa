@@ -1,5 +1,9 @@
-# Compute median, 1st quartile and 3rd quartile of performance measure for
-# stationary and nonstationary subspaces
+# Compute
+# 1. median, 1st quartile and 3rd quartile of performance measure for
+# stationary and nonstationary subspaces, and
+# 2. componentwise mean of eigenvalues
+# for each simulation setting.
+
 library(dplyr)
 
 args <- readr::read_csv("sim-args.csv", col_types = "ciiiccclii")
@@ -53,7 +57,7 @@ for (i in seq_len(nrow(args))) {
     nonstationary_upper_quartile = q_i$nonstationary[3]
   )
 
-  # Compute average eigenvalue
+  # Compute componentwise average eigenvalue
   lambda_avg[i, ] <- readr::read_csv(stringr::str_c("results/eigen/", filename),
                                      col_types = "dddd") %>%
     colMeans() %>%
