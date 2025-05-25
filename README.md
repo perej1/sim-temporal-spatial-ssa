@@ -19,10 +19,10 @@ spatio-temporal data.
 Below, the purpose of each script is explained:
 
 - `functions.R` - Global functions
-- `simulate-setting.R` - Perform simulation scenario corresponding a selected
-  setting
-- `gen-arg.R` - Generate arguments for simulation settings
-- `sim-batch.sh` - Run a batch of simulations settings with different parameters
+- `simulate-setting.R` - Perform a simulation scenario corresponding to selected
+  parameters
+- `gen-arg.R` - Generate arguments for the simulation scenarios
+- `sim-batch.sh` - Run a batch of simulation scenarios with different parameters
 - `compute-stats.R` - Compute 1st, 2nd and 3rd quartiles of the performance
   measure for different simulation scenarios
 - `plot-boxplots.R` - Summarise results by plotting boxplots
