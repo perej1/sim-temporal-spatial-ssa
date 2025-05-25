@@ -1,115 +1,87 @@
-# Summarise results by plotting boxplots
+# Have boxplots corresponding to scenarios.
 
-library(optparse)
 library(ggplot2)
-suppressMessages(library(dplyr))
+library(dplyr)
 
+args <- readr::read_csv("sim-args.csv", col_types = "fiiiffflii")
 
-option_list <- list(
-  make_option("--n_spatial", type = "character", default = "10:50",
-              help = "Spatial sample sizes"),
-  make_option("--n_time", type = "character", default = "50:10",
-              help = "Temporal sample sizes")
-)
-opt_parser <- OptionParser(option_list = option_list)
-opt <- parse_args(opt_parser)
+# Extract desired scenarios for plotting
+seg_labels_osc <- c("thirds", "yconstant", "xconstant")
+osc_data <- args %>%
+  filter(latent == "oscillating", random_eigenvect == FALSE, n_spatial == 500,
+         n_time == 1000) %>%
+  {
+    stringr::str_c(
+      "latent_", .$latent,
+      "_n_spatial_", .$n_spatial,
+      "_n_time_", .$n_time,
+      "_m_", .$m,
+      "_x_blocks_", .$x_blocks,
+      "_y_blocks_", .$y_blocks,
+      "_time_blocks_", .$time_blocks,
+      "_random_eigenvect_", .$random_eigenvect,
+      "_seed_spatial_", .$seed_spatial,
+      "_seed_sim_", .$seed_sim,
+      ".csv"
+    )
+  } %>%
+  purrr::map(\(x) {
+    readr::read_csv(stringr::str_c("results/perf/", x), col_types = "dd")
+  }) %>%
+  do.call(bind_rows, .) %>%
+  tibble::add_column(segmentation = rep(seg_labels_osc, each = 100)) %>%
+  tidyr::pivot_longer(cols = !segmentation, names_to = "type")
 
-n_spatial_arg <- as.integer(stringr::str_split_1(opt$n_spatial, ":"))
-n_time_arg <- as.integer(stringr::str_split_1(opt$n_time, ":"))
+seg_labels_spacetime <- c("xconstant", "yconstant", "tconstant", "halfs",
+                          "thirds", "quarters", "tenths")
+spacetime_data <- args %>%
+  filter(latent == "spacetime", random_eigenvect == FALSE,
+         x_blocks != "5:5:5:5:5:5:5:5:5:5:5:5:5:5:5:5:5:5:5:5") %>%
+  {
+    stringr::str_c(
+      "latent_", .$latent,
+      "_n_spatial_", .$n_spatial,
+      "_n_time_", .$n_time,
+      "_m_", .$m,
+      "_x_blocks_", .$x_blocks,
+      "_y_blocks_", .$y_blocks,
+      "_time_blocks_", .$time_blocks,
+      "_random_eigenvect_", .$random_eigenvect,
+      "_seed_spatial_", .$seed_spatial,
+      "_seed_sim_", .$seed_sim,
+      ".csv"
+    )
+  } %>%
+  purrr::map(\(x) {
+    readr::read_csv(stringr::str_c("results/perf/", x), col_types = "dd")
+  }) %>%
+  do.call(bind_rows, .) %>%
+  tibble::add_column(segmentation = rep(seg_labels_spacetime, each = 100)) %>%
+  tidyr::pivot_longer(cols = !segmentation, names_to = "type")
 
-args <- readr::read_csv("sim-args.csv", col_types = "iiicccliiii")
+# Plotting
+osc_plot <- osc_data %>%
+  ggplot(aes(x = factor(segmentation), y = value, fill = factor(type))) +
+  geom_boxplot() +
+  xlab("Segmentation") +
+  ylab("Performance") +
+  theme(panel.background = element_blank(),
+        axis.line = element_line(colour = "black"),
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 10),
+        panel.grid.major.y = element_line(colour = alpha("black", 0.2)),
+        panel.grid.major.x = element_blank())
+ggsave("plots/oscillating.png", osc_plot)
 
-# Check that given arguments are valid
-if (length(n_spatial_arg) != length(n_time_arg)) {
-  rlang::abort(stringr::str_c("Number of sample sizes in `n_spatial` and ",
-                              "`n_time` must be the same"))
-}
-
-if (!all(n_spatial_arg %in% args$n_spatial & n_time_arg %in% args$n_time)) {
-  rlang::abort("Invalid sample sizes.")
-}
-
-n <- tibble::tibble(n_spatial = n_spatial_arg, n_time = n_time_arg)
-
-args_not_n <- args %>%
-  select(-n_spatial, -n_time) %>%
-  distinct()
-
-for (i in seq_len(nrow(args_not_n))) {
-  arg_i <- args_not_n[i, ]
-  perf_list <- list()
-  for (j in seq_len(nrow(n))) {
-    filename <- stringr::str_c("n_spatial_", n[j, ]$n_spatial,
-                               "_n_time_", n[j, ]$n_time,
-                               "_m_", arg_i$m,
-                               "_x_blocks_", arg_i$x_blocks,
-                               "_y_blocks_", arg_i$y_blocks,
-                               "_time_blocks_", arg_i$time_blocks,
-                               "_include_var_nonstationary_",
-                               arg_i$include_var_nonstationary,
-                               "_dim_", arg_i$dim,
-                               "_dim_nonstationary_", arg_i$dim_nonstationary,
-                               "_seed_spatial_", arg_i$seed_spatial,
-                               "_seed_sim_", arg_i$seed_sim, ".csv")
-    perf_list[[j]] <- read.csv(stringr::str_c("results/perf/", filename))
-    perf_list[[j]] <- perf_list[[j]] %>%
-      tibble::add_column(n_spatial_time = stringr::str_c(n[j, ],
-                                                         collapse = ":"))
-  }
-  # Make long tibble for plotting
-  perfs <- do.call(bind_rows, perf_list) %>%
-    tidyr::pivot_longer(cols = !n_spatial_time, names_to = "type")
-
-  # Plotting
-  stationary <- perfs %>%
-    filter(type == "stationary") %>%
-    ggplot(aes(x = n_spatial_time, y = value)) +
-    geom_boxplot(fill = "skyblue")
-  stationary
-
-  labels <- sprintf("n_spatial = %d\nn_time = %d", n$n_spatial, n$n_time)
-
-  nonstationary <- perfs %>%
-    filter(type == "nonstationary") %>%
-    ggplot(aes(x = n_spatial_time, y = value)) +
-    geom_boxplot(fill = "pink") +
-    xlab("") +
-    ylab("Performance") +
-    theme(panel.background = element_blank(),
-          axis.line = element_line(colour = "black"),
-          axis.text = element_text(size = 15),
-          axis.title = element_text(size = 15),
-          panel.grid.major.y = element_line(colour = alpha("black", 0.2)),
-          panel.grid.major.x = element_blank()) +
-    scale_x_discrete(labels = labels)
-
-  stationary <- perfs %>%
-    filter(type == "stationary") %>%
-    ggplot(aes(x = n_spatial_time, y = value)) +
-    geom_boxplot(fill = "pink") +
-    xlab("") +
-    ylab("Performance") +
-    theme(panel.background = element_blank(),
-          axis.line = element_line(colour = "black"),
-          axis.text = element_text(size = 15),
-          axis.title = element_text(size = 15),
-          panel.grid.major.y = element_line(colour = alpha("black", 0.2)),
-          panel.grid.major.x = element_blank()) +
-    scale_x_discrete(labels = labels)
-
-  plotname <- stringr::str_c("n_spatial_", opt$n_spatial,
-                             "_n_time_", opt$n_time,
-                             "_m_", arg_i$m,
-                             "_x_blocks_", arg_i$x_blocks,
-                             "_y_blocks_", arg_i$y_blocks,
-                             "_time_blocks_", arg_i$time_blocks,
-                             "_include_var_nonstationary_",
-                             arg_i$include_var_nonstationary,
-                             "_dim_", arg_i$dim,
-                             "_dim_nonstationary_", arg_i$dim_nonstationary,
-                             "_seed_spatial_", arg_i$seed_spatial,
-                             "_seed_sim_", arg_i$seed_sim, ".png")
-
-  ggsave(stringr::str_c("plots/nonstationary/", plotname), nonstationary)
-  ggsave(stringr::str_c("plots/stationary/", plotname), stationary)
-}
+spacetime_plot <- spacetime_data %>%
+  ggplot(aes(x = factor(segmentation), y = value, fill = factor(type))) +
+  geom_boxplot() +
+  xlab("Segmentation") +
+  ylab("Performance") +
+  theme(panel.background = element_blank(),
+        axis.line = element_line(colour = "black"),
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 10),
+        panel.grid.major.y = element_line(colour = alpha("black", 0.2)),
+        panel.grid.major.x = element_blank())
+ggsave("plots/spacetime.png", spacetime_plot)
