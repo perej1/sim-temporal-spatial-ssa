@@ -58,10 +58,10 @@ simulate <- function(i, coords) {
 
   # Set latent components
   if (opt$latent == "spacetime") {
-    f1 <- gen_field_cluster(coords, seq(-20, 30, 10), rep(1, 6), 100, c(50, 50),
-                            c(33, 33, 34))
-    f2 <- gen_field_cluster(coords, seq(-40, 30, 10), rep(1, 8), c(50, 50),
-                            c(50, 50), c(50, 50))
+    f1 <- gen_field_cluster(coords, c(0.5, 0.7), rep(1, 2), 100, c(50, 50),
+                            100)
+    f2 <- gen_field_cluster(coords, c(-0.5, -0.7), rep(1, 2), 100, 100,
+                            c(50, 50))
   } else if (opt$latent == "oscillating") {
     f1 <- gen_field_cluster(coords, c(5, 5, -5, -5, 5, 5, -5, -5), rep(1, 8),
                             c(50, 50), c(50, 50), c(50, 50))
