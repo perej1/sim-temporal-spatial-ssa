@@ -59,6 +59,10 @@ spacetime_data <- args %>%
   tibble::add_column(segmentation = rep(seg_labels_spacetime, each = 100)) %>%
   tidyr::pivot_longer(cols = !segmentation, names_to = "type")
 
+spacetime_data$segmentation <- factor(spacetime_data$segmentation,
+                                      levels = seg_labels_spacetime,
+                                      ordered = TRUE)
+
 # Plotting
 osc_plot <- osc_data %>%
   ggplot(aes(x = factor(segmentation), y = value, fill = factor(type))) +
@@ -70,7 +74,14 @@ osc_plot <- osc_data %>%
         axis.text = element_text(size = 10),
         axis.title = element_text(size = 10),
         panel.grid.major.y = element_line(colour = alpha("black", 0.2)),
-        panel.grid.major.x = element_blank())
+        panel.grid.major.x = element_blank()) +
+  scale_fill_manual(values = c("stationary" = "skyblue",
+                               "nonstationary" = "pink"),
+                    labels = c("stationary" = "Stationary",
+                               "nonstationary" = "Nonstationary"),
+                    name = "") +
+  scale_x_discrete(labels = c("thirds" = "Thirds", "xconstant" = "Xconstant",
+                              "yconstant" = "Yconstant"))
 ggsave("plots/oscillating.png", osc_plot)
 
 spacetime_plot <- spacetime_data %>%
@@ -83,5 +94,19 @@ spacetime_plot <- spacetime_data %>%
         axis.text = element_text(size = 10),
         axis.title = element_text(size = 10),
         panel.grid.major.y = element_line(colour = alpha("black", 0.2)),
-        panel.grid.major.x = element_blank())
+        panel.grid.major.x = element_blank()) +
+  scale_fill_manual(values = c("stationary" = "skyblue",
+                               "nonstationary" = "pink"),
+                    labels = c("stationary" = "Stationary",
+                               "nonstationary" = "Nonstationary"),
+                    name = "") +
+  scale_x_discrete(labels = c("thirds" = "Thirds",
+                              "xconstant" = "Xconstant",
+                              "yconstant" = "Yconstant",
+                              "tconstant" = "Tconstant",
+                              "halfs" = "Halfs",
+                              "thirds" = "Thirds",
+                              "quarters" = "Quarters",
+                              "tenths" = "Tenths"),
+  )
 ggsave("plots/spacetime.png", spacetime_plot)
