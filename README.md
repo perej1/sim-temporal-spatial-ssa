@@ -1,5 +1,6 @@
 # sim-temporal-spatial-ssa
-Simulations for an article about (non)stationary subspace analysis for temporal spatial data.
+Simulations for an article about (non)stationary subspace analysis for
+spatio-temporal data.
 
 ## Requirements
 
@@ -17,13 +18,14 @@ Simulations for an article about (non)stationary subspace analysis for temporal 
 
 Below, the purpose of each script is explained:
 
-- `simulate-setting.R` - Perform simulation for a selected setting
-- `summarise.R` - Summarise results by plotting boxplots
-- `sim-batch.sh` - Run a batch of simulations settings with different
-- `summarise-batch.sh` - Run `summarise.R` with selected parameters
-  parameters
 - `functions.R` - Global functions
+- `simulate-setting.R` - Perform simulation scenario corresponding a selected
+  setting
 - `gen-arg.R` - Generate arguments for simulation settings
+- `sim-batch.sh` - Run a batch of simulations settings with different parameters
+- `compute-stats.R` - Compute 1st, 2nd and 3rd quartiles of the performance
+  measure for different simulation scenarios
+- `plot-boxplots.R` - Summarise results by plotting boxplots
 - `test-gen_field_cluster.R` - Unit test for the function `gen_field_cluster()`
 
 Generate arguments by
@@ -40,8 +42,8 @@ mkdir eigen
 mkdir perf
 ```
 
-After this, corresponding scenarios can be run with (in the root directory of
-the project)
+After this, scenarios given by `gen-arg.R` can be run with (in the root
+directory of the project)
 ```
 bash sim-batch.sh
 ```
@@ -49,8 +51,7 @@ Simulation results corresponding to each scenario are saved in the directory
 `results/`.
 
 
-For plotting make directories `plots/stationary/` and `plots/nonstationary/`.
-Then plots can be produced with
+For plotting create directory `plots/`. Then, plots can be produced with
 ```
-bash summarise-batch.sh
+Rscript plot-boxplots.R
 ```
