@@ -3,9 +3,25 @@
 library(ggplot2)
 library(dplyr)
 
-args <- readr::read_csv("sim-args.csv", col_types = "fiiiffflii")
+# Extract medians corresponding to cases random_eigenvect == TRUE
+medians_random <- readr::read_csv("results/perf-quantiles.csv",
+                                  col_types = "fiiifffliidddddd") %>%
+  filter(random_eigenvect == TRUE) %>%
+  filter((latent == "oscillating" & n_spatial == 500 & n_time == 1000) |
+           (latent == "spacetime" & n_spatial == 50 & n_time == 100)) %>%
+  select(latent, stationary_median, nonstationary_median) %>%
+  tidyr::pivot_longer(!latent)
+
+medians_random_osc <- medians_random %>%
+  filter(latent == "oscillating")
+
+medians_random_spacetime <- medians_random %>%
+  filter(latent == "spacetime")
+
 
 # Extract desired scenarios for plotting
+args <- readr::read_csv("sim-args.csv", col_types = "fiiiffflii")
+
 seg_labels_osc <- c("thirds", "yconstant", "xconstant")
 osc_data <- args %>%
   filter(latent == "oscillating", random_eigenvect == FALSE, n_spatial == 500,
@@ -63,10 +79,15 @@ spacetime_data$segmentation <- factor(spacetime_data$segmentation,
                                       levels = seg_labels_spacetime,
                                       ordered = TRUE)
 
+
 # Plotting
 osc_plot <- osc_data %>%
   ggplot(aes(x = factor(segmentation), y = value, fill = factor(type))) +
   geom_boxplot() +
+  geom_hline(aes(yintercept = value, color = factor(name),
+                 linetype = factor(name)),
+             medians_random_osc,
+             linewidth = 0.7) +
   xlab("Segmentation") +
   ylab("Performance") +
   theme(panel.background = element_blank(),
@@ -75,14 +96,29 @@ osc_plot <- osc_data %>%
         axis.title = element_text(size = 10),
         panel.grid.major.y = element_line(colour = alpha("black", 0.2)),
         panel.grid.major.x = element_blank()) +
-  scale_fill_manual(values = c("stationary" = "skyblue",
+  scale_fill_manual(name = "Method",
+                    values = c("stationary" = "skyblue",
                                "nonstationary" = "pink"),
                     labels = c("stationary" = "Stationary",
-                               "nonstationary" = "Nonstationary"),
-                    name = "") +
+                               "nonstationary" = "Nonstationary")) +
   scale_x_discrete(labels = c("thirds" = "Thirds", "xconstant" = "Xconstant",
-                              "yconstant" = "Yconstant"))
-ggsave("plots/oscillating.png", osc_plot)
+                              "yconstant" = "Yconstant")) +
+  scale_color_manual(
+    name = "Baseline",
+    values = c("stationary_median" = "skyblue",
+               "nonstationary_median" = "pink"),
+    labels = c("stationary_median" = "Stationary",
+               "nonstationary_median" = "Nonstationary")
+  ) +
+  scale_linetype_manual(
+    name = "Baseline",
+    values = c("stationary_median" = "dashed",
+               "nonstationary_median" = "solid"),
+    labels = c("stationary_median" = "Stationary",
+               "nonstationary_median" = "Nonstationary")
+  )
+osc_plot
+ggsave("plots/oscillating.pdf", osc_plot)
 
 spacetime_plot <- spacetime_data %>%
   ggplot(aes(x = factor(segmentation), y = value, fill = factor(type))) +
@@ -109,4 +145,4 @@ spacetime_plot <- spacetime_data %>%
                               "quarters" = "Quarters",
                               "tenths" = "Tenths"),
   )
-ggsave("plots/spacetime.png", spacetime_plot)
+ggsave("plots/spacetime.pdf", spacetime_plot)
