@@ -87,7 +87,7 @@ osc_plot <- osc_data %>%
   geom_hline(aes(yintercept = value, color = factor(name),
                  linetype = factor(name)),
              medians_random_osc,
-             linewidth = 0.7) +
+             linewidth = 1.5) +
   xlab("Segmentation") +
   ylab("Performance") +
   theme(panel.background = element_blank(),
@@ -112,17 +112,21 @@ osc_plot <- osc_data %>%
   ) +
   scale_linetype_manual(
     name = "Baseline",
-    values = c("stationary_median" = "dashed",
-               "nonstationary_median" = "solid"),
+    values = c("stationary_median" = "dotted",
+               "nonstationary_median" = "dashed"),
     labels = c("stationary_median" = "Stationary",
                "nonstationary_median" = "Nonstationary")
-  )
-osc_plot
+  ) +
+  guides(linetype = guide_legend(override.aes = list(linewidth = 0.6)))
 ggsave("plots/oscillating.pdf", osc_plot)
 
 spacetime_plot <- spacetime_data %>%
   ggplot(aes(x = factor(segmentation), y = value, fill = factor(type))) +
   geom_boxplot() +
+  geom_hline(aes(yintercept = value, color = factor(name),
+                 linetype = factor(name)),
+             medians_random_spacetime,
+             linewidth = 1.5) +
   xlab("Segmentation") +
   ylab("Performance") +
   theme(panel.background = element_blank(),
@@ -135,7 +139,7 @@ spacetime_plot <- spacetime_data %>%
                                "nonstationary" = "pink"),
                     labels = c("stationary" = "Stationary",
                                "nonstationary" = "Nonstationary"),
-                    name = "") +
+                    name = "Method") +
   scale_x_discrete(labels = c("thirds" = "Thirds",
                               "xconstant" = "Xconstant",
                               "yconstant" = "Yconstant",
@@ -144,5 +148,20 @@ spacetime_plot <- spacetime_data %>%
                               "thirds" = "Thirds",
                               "quarters" = "Quarters",
                               "tenths" = "Tenths"),
-  )
+  ) +
+  scale_color_manual(
+    name = "Baseline",
+    values = c("stationary_median" = "skyblue",
+               "nonstationary_median" = "pink"),
+    labels = c("stationary_median" = "Stationary",
+               "nonstationary_median" = "Nonstationary")
+  ) +
+  scale_linetype_manual(
+    name = "Baseline",
+    values = c("stationary_median" = "dotted",
+               "nonstationary_median" = "dashed"),
+    labels = c("stationary_median" = "Stationary",
+               "nonstationary_median" = "Nonstationary")
+  ) +
+  guides(linetype = guide_legend(override.aes = list(linewidth = 0.6)))
 ggsave("plots/spacetime.pdf", spacetime_plot)
