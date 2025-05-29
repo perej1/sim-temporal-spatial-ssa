@@ -1,6 +1,6 @@
 # Functions for the simulations
-
 suppressMessages(library(dplyr))
+
 
 #' Compute negative square root of a positive definite matrix
 #'
@@ -61,6 +61,45 @@ gen_coords <- function(n_spatial, n_time, seed) {
 }
 
 
+#' Create a covariance matrix corresponding to the spatiotemporal locations
+#'
+#' The chosen covariance function is separable. For spatial dependence structure
+#' we use the Matern covariance function. For the temporal dependence structure
+#' we use the exponential covariance function.
+#'
+#' @param coords sftime object with locations and time but no fields
+#'
+#' @returns Covariance matrix corresponding to spatiotemporal locations
+gen_cov_separable <- function(coords) {
+  coords_space <- unique(coords$geometry)
+  coords_time <- unique(coords$time)
+  n_space <- length(coords_space)
+  n_time <- length(coords_time)
+
+  covmat_space <- matrix(rep(0, n_space^2), nrow = n_space)
+  for (i in 1:n_space) {
+    for (j in i:n_space) {
+      dist_space <- as.double(sf::st_distance(coords_space[[i]],
+                                              coords_space[[j]]))
+      covmat_space[i, j] <- fields::Matern(dist_space, range = 1,
+                                           smoothness = 1)
+    }
+  }
+  covmat_space <- covmat_space + t(covmat_space) - diag(n_space)
+
+  covmat_time <- matrix(rep(0, n_time^2), nrow = n_time)
+  for (i in 1:n_time) {
+    for (j in i:n_time) {
+      dist_time <- abs(coords_time[i] - coords_time[j])
+      covmat_time[i, j] <- fields::Exponential(dist_time, aRange = 1, theta = 1)
+    }
+  }
+  covmat_time <- covmat_time + t(covmat_time) - diag(n_time)
+
+  covmat_time %x% covmat_space
+}
+
+
 #' Compute segments for spatio-temporal coordinates
 #'
 #' @param coords sftime object with locations and time but no fields
@@ -97,16 +136,15 @@ compute_segments <- function(coords, x_prop, y_prop, time_prop) {
 #'
 #' @param coords sftime object with locations and time but no fields
 #' @param mu Expected value for each segment
-#' @param sigma Standard deviation for each segment
+#' @param covmat Covariance matrix corresponding to spatiotemporal locations
 #' @param x_prop Division of x-axis of the [0,1] x [0,1] box in terms of %
 #' @param y_prop Division of y-axis of the [0,1] x [0,1] box in terms of %
 #' @param time_prop Division of time in terms of %
 #'
 #' @returns Vector giving value of the field at each spatio-temporal coordinate
-gen_field_cluster <- function(coords, mu, sigma, x_prop, y_prop, time_prop) {
-  mu_sigma_len <- length(x_prop) * length(y_prop) * length(time_prop)
-  if (length(mu) != mu_sigma_len || length(sigma) != mu_sigma_len) {
-    rlang::abort("'mu' or 'sigma' has wrong length.")
+gen_field_cluster <- function(coords, mu, covmat, x_prop, y_prop, time_prop) {
+  if (length(mu) != length(x_prop) * length(y_prop) * length(time_prop)) {
+    rlang::abort("'mu' has wrong length.")
   }
   segments <- compute_segments(coords, x_prop, y_prop, time_prop) %>%
     mutate(comb = interaction(x_segment, y_segment, time_segment)) %>%
@@ -114,7 +152,6 @@ gen_field_cluster <- function(coords, mu, sigma, x_prop, y_prop, time_prop) {
 
   indices <- match(segments, levels(segments))
   mu_for_segment <- mu[indices]
-  sigma_for_segment <- sigma[indices]
 
-  stats::rnorm(nrow(coords), mu_for_segment, sigma_for_segment)
+  MASS::mvrnorm(n = 1, mu_for_segment, covmat)
 }
