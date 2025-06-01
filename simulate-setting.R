@@ -1,17 +1,18 @@
 # Perform m rounds of simulations for a particular setting. On each
 # round i = 1, ..., m, the mixing matrix is different. More precisely, elements
 # of the mixing matrix are generated from uniform distribution on [-1, 1].
-
+tictoc::tic()
 library(optparse)
 source("functions.R")
 
 
 option_list <- list(
-  make_option("--latent", type = "character", default = "oscillating",
-              help = "For different options the latent field is different."),
-  make_option("--n_spatial", type = "integer", default = 50,
+  make_option("--mu", type = "character", default = "oscillating",
+              help = "For different options the latent field has different mean."),
+  make_option("--epsilon", type = "character", default = "loc_time_ind"),
+  make_option("--n_spatial", type = "integer", default = 100,
               help = "Number of spatial locations at each time point"),
-  make_option("--n_time", type = "integer", default = 100,
+  make_option("--n_time", type = "integer", default = 300,
               help = "number of time points, indexing starts from 0"),
   make_option("--m", type = "integer", default = 100,
               help = "Number of repetitions per scenario"),
@@ -57,26 +58,36 @@ simulate <- function(i, coords) {
   }
 
   # Set latent components
-  if (opt$latent == "spacetime") {
-    f1 <- gen_field_cluster(coords, c(0.5, 0.7), rep(1, 2), 100, c(50, 50),
+  if (opt$epsilon == "no_dep") {
+    epsilon <- 1:dim %>%
+      purrr::map(\(i) stats::rnorm(opt$n_spatial * opt$n_time))
+  } else if (opt$epsilon == "loc_time_ind") {
+    epsilon <- 1:dim %>%
+      purrr::map(\(i) gen_independent_loc_time(coords))
+  } else {
+    rlang::abort("Invalid option for the argument --epsilon.")
+  }
+
+  if (opt$mu == "spacetime") {
+    f1 <- gen_field_cluster(coords, epsilon[[1]], c(0.5, 0.7), 100, c(50, 50),
                             100)
-    f2 <- gen_field_cluster(coords, c(-0.5, -0.7), rep(1, 2), 100, 100,
+    f2 <- gen_field_cluster(coords, epsilon[[2]], c(-0.5, -0.7), 100, 100,
                             c(50, 50))
-  } else if (opt$latent == "oscillating") {
-    f1 <- gen_field_cluster(coords, c(5, 5, -5, -5, 5, 5, -5, -5), rep(1, 8),
+  } else if (opt$mu == "oscillating") {
+    f1 <- gen_field_cluster(coords, epsilon[[1]], c(5, 5, -5, -5, 5, 5, -5, -5),
                             c(50, 50), c(50, 50), c(50, 50))
-    f2 <- gen_field_cluster(coords, c(5, -5, 5, -5, 5, -5, 5, -5), rep(1, 8),
+    f2 <- gen_field_cluster(coords, epsilon[[2]], c(5, -5, 5, -5, 5, -5, 5, -5),
                             c(50, 50), c(50, 50), c(50, 50))
   } else {
-    rlang::abort("Invalid option for the argument --latent.")
+    rlang::abort("Invalid option for the argument --mu.")
   }
 
   latent <- coords %>%
     mutate(
       f1 = f1,
       f2 = f2,
-      f4 = gen_field_cluster(., 0, 1, 100, 100, 100),
-      f5 = gen_field_cluster(., 0, 1, 100, 100, 100)
+      f3 = epsilon[[3]],
+      f4 = epsilon[[4]]
     ) %>%
     sftime::st_drop_time() %>%
     sf::st_drop_geometry()
@@ -171,7 +182,8 @@ eigenval <- do.call(rbind, res$mean_var_eigen_values)
 colnames(eigenval) <- stringr::str_c("f", 1:dim)
 
 # Save results
-filename <- stringr::str_c("latent_", opt$latent,
+filename <- stringr::str_c("mu_", opt$mu,
+                           "_epsilon_", opt$epsilon,
                            "_n_spatial_", opt$n_spatial,
                            "_n_time_", opt$n_time,
                            "_m_", opt$m,
@@ -187,3 +199,4 @@ tibble::as_tibble(performance) %>%
 
 tibble::as_tibble(eigenval) %>%
   readr::write_csv(stringr::str_c("results/eigen/", filename))
+tictoc::toc()
