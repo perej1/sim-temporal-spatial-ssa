@@ -8,7 +8,8 @@ source("functions.R")
 
 option_list <- list(
   make_option("--mu", type = "character", default = "oscillating",
-              help = "For different options the latent field has different mean."),
+              help = stringr::str_c("For different options the latent field ",
+                                    "has different mean.")),
   make_option("--epsilon", type = "character", default = "separable_blocks"),
   make_option("--n_spatial", type = "integer", default = 50,
               help = "Number of spatial locations at each time point"),
@@ -79,13 +80,11 @@ simulate <- function(i, coords) {
     aRange <- stats::runif(dim * num, 0.5, 1)
     theta <- stats::runif(dim * num, 0.5, 1)
     epsilon <- 1:dim %>%
-      purrr::map(\(i) gen_separable_blocks(
-        coords, x_prop, y_prop, time_prop,
+      purrr::map(\(i) gen_separable_blocks(coords, x_prop, y_prop, time_prop,
         range[((i - 1) * num + 1):(i * num)],
         smoothness[((i - 1) * num + 1):(i * num)],
         aRange[((i - 1) * num + 1):(i * num)],
-        theta[((i - 1) * num + 1):(i * num)])
-    )
+        theta[((i - 1) * num + 1):(i * num)]))
   } else {
     rlang::abort("Invalid option for the argument --epsilon.")
   }
