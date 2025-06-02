@@ -1,6 +1,7 @@
 # sim-temporal-spatial-ssa
 Simulations for an article about (non)stationary subspace analysis for
-spatio-temporal data.
+spatio-temporal data. In the simulations we focus only on nonstationarity with
+respect to mean.
 
 ## Requirements
 
@@ -51,7 +52,7 @@ Simulation results corresponding to each scenario are saved in the directory
 `results/`.
 
 
-For plotting create directory `plots/`. Then, plots can be produced with
+For plotting, create the directory `plots/`. Then, plots can be produced with
 ```
 Rscript plot-boxplots.R
 ```
