@@ -1,7 +1,6 @@
 # Perform m rounds of simulations for a particular setting. On each
-# round i = 1, ..., m, the mixing matrix is different. More precisely, elements
+# round i, the mixing matrix is different. More precisely, elements
 # of the mixing matrix are generated from uniform distribution on [-1, 1].
-tictoc::tic()
 library(optparse)
 source("functions.R")
 
@@ -10,7 +9,9 @@ option_list <- list(
   make_option("--mu", type = "character", default = "spacetime",
               help = stringr::str_c("For different options the latent field ",
                                     "has different mean.")),
-  make_option("--epsilon", type = "character", default = "no_dep"),
+  make_option("--epsilon", type = "character", default = "no_dep",
+              help = stringr::str_c("For different options the latent field ",
+                                    "has different dependence structure")),
   make_option("--n_spatial", type = "integer", default = 50,
               help = "Number of spatial locations at each time point"),
   make_option("--n_time", type = "integer", default = 100,
@@ -62,13 +63,13 @@ if (opt$epsilon == "loc_time_ind") {
   theta <- stats::runif(dim * num, 0.5, 1)
 }
 
-#' Perform ith repetition of the setting
+#' Perform ith repetition for a particular setting
 #'
-#' @param i Repetition i of the simulation setting
-#' @param coords Spatio-temporal coordinates
+#' @param i The simulation round.
+#' @param coords An sftime object with locations and time but no fields.
 #'
-#' @returns A list of length 2: eigenvalues and performance indices for
-#'   stationary and nonstationary subspaces
+#' @returns A list of length 2: (i) eigenvalues and (ii) performance indices for
+#'   stationary and nonstationary subspaces.
 simulate <- function(i, coords) {
 
   # Set mixing matrix
@@ -98,7 +99,7 @@ simulate <- function(i, coords) {
         smoothness[((i - 1) * num + 1):(i * num)],
         aRange[((i - 1) * num + 1):(i * num)],
         theta[((i - 1) * num + 1):(i * num)]
-        ))
+      ))
   } else {
     rlang::abort("Invalid option for the argument --epsilon.")
   }
@@ -210,16 +211,17 @@ simulate <- function(i, coords) {
   ind_nonstat <- LDRTools::Pdist(list(a_inv_proj_nonstat, w_proj_nonstat),
                                  weights = "constant")
 
+  # Collect results
   res <- list(c(stationary = ind_stat, nonstationary = ind_nonstat),
               eigen_val = eigen(mean_var)$values)
   names(res) <- c("performance", "mean_var_eigen_values")
   res
 }
 
-# Set spatial locations
+# Set spatiotemporal coordinates
 coords <- gen_coords(opt$n_spatial, opt$n_time, opt$seed_spatial)
 
-# Perform m repetitions fo the scenario
+# Perform m repetitions for the scenario
 RNGkind("L'Ecuyer-CMRG")
 set.seed(opt$seed_sim)
 res <- parallel::mclapply(1:opt$m, simulate, coords = coords,
@@ -248,4 +250,3 @@ tibble::as_tibble(performance) %>%
 
 tibble::as_tibble(eigenval) %>%
   readr::write_csv(stringr::str_c("results/eigen/", filename))
-tictoc::toc()

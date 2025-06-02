@@ -3,6 +3,7 @@ library(dplyr)
 library(tidyr)
 library(tibble)
 
+
 seg <- c("100", "50:50", "33:33:34", "25:25:25:25",
          "10:10:10:10:10:10:10:10:10:10")
 

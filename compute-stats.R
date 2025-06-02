@@ -1,8 +1,7 @@
 # Compute
-# 1. median, 1st quartile and 3rd quartile of performance measure for
+# 1. median, 1st quartile and 3rd quartile of the performance measure for
 # stationary and nonstationary subspaces, and
-# 2. componentwise mean of eigenvalues
-# for each simulation setting.
+# 2. componentwise mean of eigenvalues for each simulation setting.
 
 library(dplyr)
 

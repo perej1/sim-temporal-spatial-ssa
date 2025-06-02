@@ -7,7 +7,7 @@ suppressMessages(library(dplyr))
 #' More precisely, function computes matrix lambda
 #' s.t. sigma^{-1} = lambda %*% lambda.
 #'
-#' @param sigma Double matrix, positive definite matrix.
+#' @param sigma A Double matrix, positive definite matrix.
 #'
 #' @return Double matrix, square root of the matrix.
 sqrtmat_inv <- function(sigma) {
@@ -22,10 +22,10 @@ sqrtmat_inv <- function(sigma) {
 
 #' Generate uniform sample of spatial locations from a box [0, 1] x [0, 1]
 #'
-#' @param n_spatial Number of spatial locations
-#' @param seed Seed for generating spatial locations
+#' @param n_spatial The number of spatial locations.
+#' @param seed The seed for generating spatial locations.
 #'
-#' @returns sf object with coordinated but with 0 features
+#' @returns sf object with coordinates but with 0 features.
 gen_unif_coords_box <- function(n_spatial, seed) {
   set.seed(seed)
   x <- stats::runif(n_spatial, 0, 1)
@@ -35,16 +35,16 @@ gen_unif_coords_box <- function(n_spatial, seed) {
 }
 
 
-#' Generate spatio-temporal locations on which the field is observed
+#' Generate spatiotemporal locations on which the field is observed
 #'
 #' Locations are uniformly distributed but they are the same for each time
 #' point. Field is observed at each time point 0, 1, ..., n_time - 1.
 #'
-#' @param n_spatial Number of spatial locations
-#' @param n_time Number of time points
-#' @param seed Seed for generating spatial locations
+#' @param n_spatial The number of spatial locations.
+#' @param n_time The number of time points.
+#' @param seed The seed for generating spatial locations.
 #'
-#' @returns sftime object with locations and time but no fields
+#' @returns An sftime object with locations and time but no fields.
 gen_coords <- function(n_spatial, n_time, seed) {
   set.seed(seed)
 
@@ -64,10 +64,12 @@ gen_coords <- function(n_spatial, n_time, seed) {
 #' Generate realization of a stationary field having independent spatial and
 #' time components
 #'
-#' @param coords sftime object with locations and time but no fields
-#' @param range,smoothness,aRange,theta Parameters for Matern and Exponential
+#' @param coords An sftime object with locations and time but no fields.
+#' @param range,smoothness,aRange,theta The parameters for Matern and
+#'   Exponential covariance functions.
 #'
-#' @returns Vector giving value of the field at each spatio-temporal coordinate
+#' @returns A Vector giving value of the field at each spatiotemporal
+#'   coordinate.
 gen_independent_loc_time <- function(coords, range, smoothness, aRange, theta) {
   coords_space <- unique(coords$geometry)
   coords_time <- unique(coords$time)
@@ -108,10 +110,11 @@ gen_independent_loc_time <- function(coords, range, smoothness, aRange, theta) {
 #' we use the Matern covariance function. For the temporal dependence structure
 #' we use the exponential covariance function.
 #'
-#' @param coords sftime object with locations and time but no fields
+#' @param coords An sftime object with locations and time but no fields.
 #' @param range,smoothness,aRange,theta Parameters for Matern and Exponential
+#'   covariance functions.
 #'
-#' @returns Covariance matrix corresponding to spatiotemporal locations
+#' @returns A Covariance matrix corresponding to spatiotemporal locations.
 gen_cov_separable <- function(coords, range, smoothness, aRange, theta) {
   coords_space <- unique(coords$geometry)
   coords_time <- unique(coords$time)
@@ -146,12 +149,11 @@ gen_cov_separable <- function(coords, range, smoothness, aRange, theta) {
 
 #' Compute segments for spatio-temporal coordinates
 #'
-#' @param coords sftime object with locations and time but no fields
-#' @param x_prop Division of x-axis of the [0,1] x [0,1] box in terms of %
-#' @param y_prop Division of y-axis of the [0,1] x [0,1] box in terms of %
-#' @param time_prop Division of time in terms of %
+#' @param coords An sftime object with locations and time but no fields
+#' @param x_prop,y_prop,time_prop Division of the corresponding axis in terms of
+#'   percentages. Percentages are given as a double vector.
 #'
-#' @returns Tibble of segments for different axes (3 columns)
+#' @returns Tibble of segments for different axes (3 columns).
 compute_segments <- function(coords, x_prop, y_prop, time_prop) {
   if (sum(x_prop) != 100 || sum(y_prop) != 100 || sum(time_prop) != 100) {
     rlang::abort("Sum of proportions must be 100.")
@@ -176,14 +178,17 @@ compute_segments <- function(coords, x_prop, y_prop, time_prop) {
 }
 
 
-#' Simulate field with separable cov structure in segments
+#' Simulate field with separable covariance structure in segments
 #'
-#' @param coords sftime object with locations and time but no fields
-#' @param x_prop,y_prop,time_prop Division of each coordinate by percentages
-#' @param range,smoothness,Arange,theta Each parameter is a vector of length 64,
-#'   Parameters for Matern and Exponential for each segment
+#' @param coords An sftime object with locations and time but no fields.
+#' @param x_prop,y_prop,time_prop Division of the corresponding axis in terms of
+#'   percentages. Percentages are given as a double vector.
+#' @param range,smoothness,Arange,theta Each parameter is a vector has length
+#'   equal to the number of segments. These are parameters for Matern and
+#'   Exponential covariance functions for each segment.
 #'
-#' @returns Vector giving value of the field at each spatio-temporal coordinate
+#' @returns A Vector giving value of the field at each spatiotemporal
+#'   coordinate.
 gen_separable_blocks <- function(coords, x_prop, y_prop, time_prop, range,
                                  smoothness, aRange, theta) {
   segments <- compute_segments(coords, x_prop, y_prop, time_prop) %>%
@@ -210,18 +215,18 @@ gen_separable_blocks <- function(coords, x_prop, y_prop, time_prop, range,
 
 #' Simulate field that is nonstationary with respect to location.
 #'
-#' Location is different in each segment in spacetime.
+#' The location is different in each segment in spacetime. The field is
+#' generatedby adding location to the zero mean field epsilon.
 #'
-#' @param coords sftime object with locations and time but no fields
-#' @param epsilon A vector of length nrow(coords). Each element describes the
-#'   value of the statianry zero mean field at the point given by the
-#'   corresponding row of coords.
-#' @param mu Expected value for each segment
-#' @param x_prop Division of x-axis of the [0,1] x [0,1] box in terms of %
-#' @param y_prop Division of y-axis of the [0,1] x [0,1] box in terms of %
-#' @param time_prop Division of time in terms of %
+#' @param coords An sftime object with locations and time but no fields.
+#' @param epsilon A Vector giving value of a zero mean field at each
+#' spatiotemporal coordinate.
+#' @param mu The expected value for each segment.
+#' @param x_prop,y_prop,time_prop Division of the corresponding axis in terms of
+#'   percentages. Percentages are given as a double vector.
 #'
-#' @returns Vector giving value of the field at each spatio-temporal coordinate
+#' @returns A Vector giving value of the field at each spatiotemporal
+#'   coordinate.
 gen_field_cluster <- function(coords, epsilon, mu, x_prop, y_prop, time_prop) {
   if (length(mu) != length(x_prop) * length(y_prop) * length(time_prop)) {
     rlang::abort("'mu' has wrong length.")
