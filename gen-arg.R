@@ -20,7 +20,8 @@ osc_method_arg <- expand_grid(
   ),
   random_eigenvect = FALSE,
   seed_spatial = 123,
-  seed_sim = 321
+  seed_sim = 321,
+  seed_cov = 541
 ) %>%
   unnest(c(n, segments))
 
@@ -36,7 +37,8 @@ osc_random_arg <- expand_grid(
   time_blocks = "100",
   random_eigenvect = TRUE,
   seed_spatial = 123,
-  seed_sim = 321
+  seed_sim = 321,
+  seed_cov = 541
 ) %>%
   unnest(n)
 
@@ -54,7 +56,8 @@ spacetime_method_arg <- expand_grid(
   ),
   random_eigenvect = FALSE,
   seed_spatial = 123,
-  seed_sim = 321
+  seed_sim = 321,
+  seed_cov = 541
 ) %>%
   unnest(segments)
 
@@ -71,7 +74,8 @@ spacetime_random_arg <- expand_grid(
   time_blocks = "100",
   random_eigenvect = TRUE,
   seed_spatial = 123,
-  seed_sim = 321
+  seed_sim = 321,
+  seed_cov = 541
 )
 
 arg <- bind_rows(osc_method_arg, osc_random_arg, spacetime_method_arg,
@@ -81,7 +85,8 @@ arg_vector <- sprintf(stringr::str_c("simulate-setting.R --mu %s --epsilon %s ",
                                      "--n_spatial %d --n_time %d --m %d ",
                                      "--x_blocks %s --y_blocks %s ",
                                      "--time_blocks %s --random_eigenvect %s ",
-                                     "--seed_spatial %d --seed_sim %d"),
+                                     "--seed_spatial %d --seed_sim %d ",
+                                     "--seed_cov %d"),
   arg$mu,
   arg$epsilon,
   arg$n_spatial,
@@ -92,7 +97,8 @@ arg_vector <- sprintf(stringr::str_c("simulate-setting.R --mu %s --epsilon %s ",
   arg$time_blocks,
   arg$random_eigenvect,
   arg$seed_spatial,
-  arg$seed_sim
+  arg$seed_sim,
+  arg$seed_cov
 )
 
 readr::write_lines(arg_vector, "sim-args.txt")

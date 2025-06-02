@@ -7,7 +7,7 @@ source("functions.R")
 
 
 option_list <- list(
-  make_option("--mu", type = "character", default = "oscillating",
+  make_option("--mu", type = "character", default = "spacetime",
               help = stringr::str_c("For different options the latent field ",
                                     "has different mean.")),
   make_option("--epsilon", type = "character", default = "separable_blocks"),
@@ -32,14 +32,35 @@ option_list <- list(
   make_option("--seed_spatial", type = "integer", default = 123,
               help = "Seed for generating spatial locations"),
   make_option("--seed_sim", type = "integer", default = 321,
-              help = "Seed for for the function 'simulate'")
+              help = "Seed for the function 'simulate'"),
+  make_option("--seed_cov", type = "integer", default = 541,
+              help = "Seed for the params of cov functions")
 )
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 
-# We always have four components, 2 nonstationary ones
-dim <- 4
-dim_nonstationary <- 2
+# Set number of components, and parameters for covariance functions
+if (opt$mu == "oscillating") {
+  dim <- 4
+  dim_nonstationary <- 2
+} else if (opt$mu == "spacetime") {
+  dim <- 8
+  dim_nonstationary <- 4
+}
+
+set.seed(opt$seed_cov)
+if (opt$epsilon == "loc_time_ind") {
+  range <- stats::runif(dim, 0.5, 1)
+  smoothness <- stats::runif(dim, 0.5, 1)
+  aRange <- stats::runif(dim, 0.5, 1)
+  theta <- stats::runif(dim, 0.5, 1)
+} else if (opt$epsilon == "separable_blocks") {
+  num <- 40 # Comes from segmentation in the option epsilon=="separable_blocks"
+  range <- stats::runif(dim * num, 0.5, 1)
+  smoothness <- stats::runif(dim * num, 0.5, 1)
+  aRange <- stats::runif(dim * num, 0.5, 1)
+  theta <- stats::runif(dim * num, 0.5, 1)
+}
 
 #' Perform ith repetition of the setting
 #'
@@ -63,28 +84,21 @@ simulate <- function(i, coords) {
     epsilon <- 1:dim %>%
       purrr::map(\(i) stats::rnorm(opt$n_spatial * opt$n_time))
   } else if (opt$epsilon == "loc_time_ind") {
-    range <- stats::runif(1, 0.5, 1)
-    smoothness <- stats::runif(1, 0.5, 1)
-    aRange <- stats::runif(1, 0.5, 1)
-    theta <- stats::runif(1, 0.5, 1)
     epsilon <- 1:dim %>%
-      purrr::map(\(i) gen_independent_loc_time(coords, range, smoothness,
-                                               aRange, theta))
+      purrr::map(\(i) gen_independent_loc_time(coords, range[i], smoothness[i],
+                                               aRange[i], theta[i]))
   } else if (opt$epsilon == "separable_blocks") {
-    x_prop <- c(50, 50)
-    y_prop <- c(50, 50)
-    time_prop <- rep(10, 10)
-    num <- length(x_prop) * length(y_prop) * length(time_prop)
-    range <- stats::runif(dim * num, 0.5, 1)
-    smoothness <- stats::runif(dim * num, 0.5, 1)
-    aRange <- stats::runif(dim * num, 0.5, 1)
-    theta <- stats::runif(dim * num, 0.5, 1)
     epsilon <- 1:dim %>%
-      purrr::map(\(i) gen_separable_blocks(coords, x_prop, y_prop, time_prop,
+      purrr::map(\(i) gen_separable_blocks(
+        coords,
+        c(50, 50),
+        c(50, 50),
+        rep(10, 10),
         range[((i - 1) * num + 1):(i * num)],
         smoothness[((i - 1) * num + 1):(i * num)],
         aRange[((i - 1) * num + 1):(i * num)],
-        theta[((i - 1) * num + 1):(i * num)]))
+        theta[((i - 1) * num + 1):(i * num)]
+        ))
   } else {
     rlang::abort("Invalid option for the argument --epsilon.")
   }
@@ -94,24 +108,40 @@ simulate <- function(i, coords) {
                             100)
     f2 <- gen_field_cluster(coords, epsilon[[2]], c(-0.5, -0.7), 100, 100,
                             c(50, 50))
+    f3 <- gen_field_cluster(coords, epsilon[[3]], c(0, 0.2), 100, c(50, 50),
+                            100)
+    f4 <- gen_field_cluster(coords, epsilon[[4]], c(0, -0.2), 100, 100,
+                            c(50, 50))
+    latent <- coords %>%
+      mutate(
+        f1 = f1,
+        f2 = f2,
+        f3 = f3,
+        f4 = f4,
+        f5 = epsilon[[5]],
+        f6 = epsilon[[6]],
+        f7 = epsilon[[7]],
+        f8 = epsilon[[8]]
+      ) %>%
+      sftime::st_drop_time() %>%
+      sf::st_drop_geometry()
   } else if (opt$mu == "oscillating") {
     f1 <- gen_field_cluster(coords, epsilon[[1]], c(5, 5, -5, -5, 5, 5, -5, -5),
                             c(50, 50), c(50, 50), c(50, 50))
     f2 <- gen_field_cluster(coords, epsilon[[2]], c(5, -5, 5, -5, 5, -5, 5, -5),
                             c(50, 50), c(50, 50), c(50, 50))
+    latent <- coords %>%
+      mutate(
+        f1 = f1,
+        f2 = f2,
+        f3 = epsilon[[3]],
+        f4 = epsilon[[4]]
+      ) %>%
+      sftime::st_drop_time() %>%
+      sf::st_drop_geometry()
   } else {
     rlang::abort("Invalid option for the argument --mu.")
   }
-
-  latent <- coords %>%
-    mutate(
-      f1 = f1,
-      f2 = f2,
-      f3 = epsilon[[3]],
-      f4 = epsilon[[4]]
-    ) %>%
-    sftime::st_drop_time() %>%
-    sf::st_drop_geometry()
 
   # Compute observed field
   observed <- latent %>%
@@ -213,7 +243,8 @@ filename <- stringr::str_c("mu_", opt$mu,
                            "_time_blocks_", opt$time_blocks,
                            "_random_eigenvect_", opt$random_eigenvect,
                            "_seed_spatial_", opt$seed_spatial,
-                           "_seed_sim_", opt$seed_sim, ".csv")
+                           "_seed_sim_", opt$seed_sim,
+                           "_seed_cov_", opt$seed_cov, ".csv")
 
 tibble::as_tibble(performance) %>%
   readr::write_csv(stringr::str_c("results/perf/", filename))
