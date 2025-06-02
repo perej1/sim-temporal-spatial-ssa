@@ -8,4 +8,5 @@ notes.txt
 figures/*
 results/*
 sim-args.*
+analyse-medians.R
 
