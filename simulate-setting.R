@@ -241,10 +241,7 @@ filename <- stringr::str_c("mu_", opt$mu,
                            "_x_blocks_", opt$x_blocks,
                            "_y_blocks_", opt$y_blocks,
                            "_time_blocks_", opt$time_blocks,
-                           "_random_eigenvect_", opt$random_eigenvect,
-                           "_seed_spatial_", opt$seed_spatial,
-                           "_seed_sim_", opt$seed_sim,
-                           "_seed_cov_", opt$seed_cov, ".csv")
+                           "_random_eigenvect_", opt$random_eigenvect, ".csv")
 
 tibble::as_tibble(performance) %>%
   readr::write_csv(stringr::str_c("results/perf/", filename))
