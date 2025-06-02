@@ -10,20 +10,20 @@ option_list <- list(
   make_option("--mu", type = "character", default = "spacetime",
               help = stringr::str_c("For different options the latent field ",
                                     "has different mean.")),
-  make_option("--epsilon", type = "character", default = "separable_blocks"),
+  make_option("--epsilon", type = "character", default = "no_dep"),
   make_option("--n_spatial", type = "integer", default = 50,
               help = "Number of spatial locations at each time point"),
   make_option("--n_time", type = "integer", default = 100,
               help = "number of time points, indexing starts from 0"),
   make_option("--m", type = "integer", default = 100,
               help = "Number of repetitions per scenario"),
-  make_option("--x_blocks", type = "character", default = "50:50",
+  make_option("--x_blocks", type = "character", default = "100",
               help = stringr::str_c("Segmentation of x coord, string gives ",
                                     "proportions of the segment lengths")),
   make_option("--y_blocks", type = "character", default = "100",
               help = stringr::str_c("Segmentation of y coord, string gives ",
                                     "proportions of the segment lengths")),
-  make_option("--time_blocks", type = "character", default = "50:50",
+  make_option("--time_blocks", type = "character", default = "100",
               help = stringr::str_c("Segmentation of time, string gives ",
                                     "proportions of the segment lengths")),
   make_option("--random_eigenvect", type = "logical", default = TRUE,
@@ -108,10 +108,10 @@ simulate <- function(i, coords) {
                             100)
     f2 <- gen_field_cluster(coords, epsilon[[2]], c(-0.5, -0.7), 100, 100,
                             c(50, 50))
-    f3 <- gen_field_cluster(coords, epsilon[[3]], c(0, 0.2), 100, c(50, 50),
+    f3 <- gen_field_cluster(coords, epsilon[[3]], c(0, 0.2), c(50, 50), 100,
                             100)
-    f4 <- gen_field_cluster(coords, epsilon[[4]], c(0, -0.2), 100, 100,
-                            c(50, 50))
+    f4 <- gen_field_cluster(coords, epsilon[[4]], seq(0, 0.2, length.out = 8),
+                            c(50, 50), c(50, 50), c(50, 50))
     latent <- coords %>%
       mutate(
         f1 = f1,

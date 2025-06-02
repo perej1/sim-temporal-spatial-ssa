@@ -4,8 +4,7 @@ library(tidyr)
 library(tibble)
 
 seg <- c("100", "50:50", "33:33:34", "25:25:25:25",
-         "10:10:10:10:10:10:10:10:10:10",
-         "5:5:5:5:5:5:5:5:5:5:5:5:5:5:5:5:5:5:5:5")
+         "10:10:10:10:10:10:10:10:10:10")
 
 # Arguments for latent == "oscillating" when using our method
 osc_method_arg <- expand_grid(
@@ -50,9 +49,9 @@ spacetime_method_arg <- expand_grid(
   n_time = 100,
   m = 100,
   segments = tibble(
-    x_blocks = seg[c(1, 2, 2, 2, 3:6)],
-    y_blocks = seg[c(2, 1, 2, 2, 3:6)],
-    time_blocks = seg[c(2, 2, 1, 2, 3:6)]
+    x_blocks = seg[c(1, 2, 2, 2, 3:5)],
+    y_blocks = seg[c(2, 1, 2, 2, 3:5)],
+    time_blocks = seg[c(2, 2, 1, 2, 3:5)]
   ),
   random_eigenvect = FALSE,
   seed_spatial = 123,
