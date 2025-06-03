@@ -1,34 +1,44 @@
 # Have boxplots corresponding to scenarios.
-
 library(ggplot2)
 library(dplyr)
+library(optparse)
+
+option_list <- list(
+  make_option("--epsilon", type = "character", default = "no_dep",
+              help = stringr::str_c("For different options the latent field ",
+                                    "has different dependence structure"))
+)
+opt_parser <- OptionParser(option_list = option_list)
+opt <- parse_args(opt_parser)
 
 # Extract medians corresponding to cases random_eigenvect == TRUE
 medians_random <- readr::read_csv("results/perf-quantiles.csv",
-                                  col_types = "fiiifffliidddddd") %>%
+                                  col_types = "cciiicccliiidddddd") %>%
+  filter(epsilon == opt$epsilon) %>%
   filter(random_eigenvect == TRUE) %>%
-  filter((latent == "oscillating" & n_spatial == 500 & n_time == 1000) |
-           (latent == "spacetime" & n_spatial == 50 & n_time == 100)) %>%
-  select(latent, stationary_median, nonstationary_median) %>%
-  tidyr::pivot_longer(!latent)
+  filter((mu == "oscillating" & n_spatial == 100 & n_time == 300) |
+           (mu == "spacetime" & n_spatial == 50 & n_time == 100)) %>%
+  select(mu, stationary_median, nonstationary_median) %>%
+  tidyr::pivot_longer(!mu)
 
 medians_random_osc <- medians_random %>%
-  filter(latent == "oscillating")
+  filter(mu == "oscillating")
 
 medians_random_spacetime <- medians_random %>%
-  filter(latent == "spacetime")
+  filter(mu == "spacetime")
 
 
 # Extract desired scenarios for plotting
-args <- readr::read_csv("sim-args.csv", col_types = "fiiiffflii")
+args <- readr::read_csv("sim-args.csv", col_types = "ffiiifffliii")
 
 seg_labels_osc <- c("thirds", "yconstant", "xconstant")
 osc_data <- args %>%
-  filter(latent == "oscillating", random_eigenvect == FALSE, n_spatial == 500,
-         n_time == 1000) %>%
+  filter(mu == "oscillating", epsilon == opt$epsilon, random_eigenvect == FALSE,
+         n_spatial == 100, n_time == 300) %>%
   {
     stringr::str_c(
-      "latent_", .$latent,
+      "mu_", .$mu,
+      "_epsilon_", .$epsilon,
       "_n_spatial_", .$n_spatial,
       "_n_time_", .$n_time,
       "_m_", .$m,
@@ -36,8 +46,6 @@ osc_data <- args %>%
       "_y_blocks_", .$y_blocks,
       "_time_blocks_", .$time_blocks,
       "_random_eigenvect_", .$random_eigenvect,
-      "_seed_spatial_", .$seed_spatial,
-      "_seed_sim_", .$seed_sim,
       ".csv"
     )
   } %>%
@@ -51,11 +59,12 @@ osc_data <- args %>%
 seg_labels_spacetime <- c("xconstant", "yconstant", "tconstant", "halfs",
                           "thirds", "quarters", "tenths")
 spacetime_data <- args %>%
-  filter(latent == "spacetime", random_eigenvect == FALSE,
-         x_blocks != "5:5:5:5:5:5:5:5:5:5:5:5:5:5:5:5:5:5:5:5") %>%
+  filter(mu == "spacetime", epsilon == opt$epsilon,
+         random_eigenvect == FALSE) %>%
   {
     stringr::str_c(
-      "latent_", .$latent,
+      "mu_", .$mu,
+      "_epsilon_", .$epsilon,
       "_n_spatial_", .$n_spatial,
       "_n_time_", .$n_time,
       "_m_", .$m,
@@ -63,8 +72,6 @@ spacetime_data <- args %>%
       "_y_blocks_", .$y_blocks,
       "_time_blocks_", .$time_blocks,
       "_random_eigenvect_", .$random_eigenvect,
-      "_seed_spatial_", .$seed_spatial,
-      "_seed_sim_", .$seed_sim,
       ".csv"
     )
   } %>%
@@ -118,7 +125,7 @@ osc_plot <- osc_data %>%
                "nonstationary_median" = "Nonstationary")
   ) +
   guides(linetype = guide_legend(override.aes = list(linewidth = 0.6)))
-ggsave("plots/oscillating.pdf", osc_plot)
+ggsave(stringr::str_c("plots/","oscillating_", opt$epsilon, ".pdf"), osc_plot)
 
 spacetime_plot <- spacetime_data %>%
   ggplot(aes(x = factor(segmentation), y = value, fill = factor(type))) +
@@ -164,4 +171,5 @@ spacetime_plot <- spacetime_data %>%
                "nonstationary_median" = "Nonstationary")
   ) +
   guides(linetype = guide_legend(override.aes = list(linewidth = 0.6)))
-ggsave("plots/spacetime.pdf", spacetime_plot)
+ggsave(stringr::str_c("plots/","spacetime_", opt$epsilon, ".pdf"),
+       spacetime_plot)

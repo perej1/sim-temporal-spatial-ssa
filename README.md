@@ -26,7 +26,9 @@ Below, the purpose of each script is explained:
 - `sim-batch.sh` - Run a batch of simulation scenarios with different parameters
 - `compute-stats.R` - Compute 1st, 2nd and 3rd quartiles of the performance
   measure for different simulation scenarios
-- `plot-boxplots.R` - Summarise results by plotting boxplots
+- `plot-boxplots.R` - Summarise results by plotting boxplots for a certain
+  dependence structure.
+- `plot-batch.sh` - Plot boxplots for corresponding to all dependence strucures.
 - `test-gen_field_cluster.R` - Unit test for the function `gen_field_cluster()`
 
 Generate arguments by
@@ -54,5 +56,5 @@ Simulation results corresponding to each scenario are saved in the directory
 
 For plotting, create the directory `plots/`. Then, plots can be produced with
 ```
-Rscript plot-boxplots.R
+bash plot-batch.sh
 ```
