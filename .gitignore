@@ -6,7 +6,8 @@ test.R
 examples/*
 notes.txt
 figures/*
-results/*
+results/eigen/*
+results/perf/*
 sim-args.*
 analyse-medians.R
 
