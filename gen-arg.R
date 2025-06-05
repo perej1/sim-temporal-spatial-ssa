@@ -9,96 +9,91 @@ seg <- c("100", "50:50", "33:33:34", "25:25:25:25",
 
 # Arguments for latent == "oscillating" when using our method
 osc_method_arg <- expand_grid(
-  mu = "oscillating",
-  epsilon = c("no_dep", "loc_time_ind", "separable_blocks"),
-  n = tibble(n_spatial = c(50, 100), n_time = c(100, 300)),
+  mu = "osc",
+  epsilon = c("noise", "seplow", "sephigh"),
+  ns = 100,
+  nt = 300,
   m = 100,
   segments = tibble(
-    x_blocks = seg[3:1],
-    y_blocks = seg[c(3, 1, 2)],
-    time_blocks = seg[c(3, 2, 2)]
+    xblocks = seg[3:1],
+    yblocks = seg[c(3, 1, 2)],
+    tblocks = seg[c(3, 2, 2)]
   ),
-  random_eigenvect = FALSE,
+  random_eigen = FALSE,
   seed_spatial = 123,
-  seed_sim = 321,
-  seed_cov = 541
+  seed_sim = 321
 ) %>%
-  unnest(c(n, segments))
+  unnest(segments)
 
 # Arguments for latent == "oscillating" when using "random" estimate for the
 # unmixing matrix
 osc_random_arg <- expand_grid(
-  mu = "oscillating",
-  epsilon = c("no_dep", "loc_time_ind", "separable_blocks"),
-  n = tibble(n_spatial = c(50, 100), n_time = c(100, 300)),
+  mu = "osc",
+  epsilon = c("noise", "seplow", "sephigh"),
+  ns = 100,
+  nt = 300,
   m = 100,
-  x_blocks = "100",
-  y_blocks = "100",
-  time_blocks = "100",
-  random_eigenvect = TRUE,
+  xblocks = "100",
+  yblocks = "100",
+  tblocks = "100",
+  random_eigen = TRUE,
   seed_spatial = 123,
-  seed_sim = 321,
-  seed_cov = 541
-) %>%
-  unnest(n)
+  seed_sim = 321
+)
 
 # Arguments for latent == "spacetime" when using our method
 spacetime_method_arg <- expand_grid(
-  mu = "spacetime",
-  epsilon = c("no_dep", "loc_time_ind", "separable_blocks"),
-  n_spatial = 50,
-  n_time = 100,
+  mu = c("xyt2", "xyt3", "xyt4"),
+  epsilon = c("noise", "seplow", "sephigh"),
+  ns = 50,
+  nt = 100,
   m = 100,
   segments = tibble(
-    x_blocks = seg[c(1, 2, 2, 2, 3:5)],
-    y_blocks = seg[c(2, 1, 2, 2, 3:5)],
-    time_blocks = seg[c(2, 2, 1, 2, 3:5)]
+    xblocks = seg[c(1, 2, 2, 2, 3:5)],
+    yblocks = seg[c(2, 1, 2, 2, 3:5)],
+    tblocks = seg[c(2, 2, 1, 2, 3:5)]
   ),
-  random_eigenvect = FALSE,
+  random_eigen = FALSE,
   seed_spatial = 123,
   seed_sim = 321,
-  seed_cov = 541
 ) %>%
   unnest(segments)
 
 # Arguments for latent == "spacetime" when using "random" estimate for the
 # unmixing matrix
 spacetime_random_arg <- expand_grid(
-  mu = "spacetime",
-  epsilon = c("no_dep", "loc_time_ind", "separable_blocks"),
-  n_spatial = 50,
-  n_time = 100,
+  mu = c("xyt2", "xyt3", "xyt4"),
+  epsilon = c("noise", "seplow", "sephigh"),
+  ns = 50,
+  nt = 100,
   m = 100,
-  x_blocks = "100",
-  y_blocks = "100",
-  time_blocks = "100",
-  random_eigenvect = TRUE,
+  xblocks = "100",
+  yblocks = "100",
+  tblocks = "100",
+  random_eigen = TRUE,
   seed_spatial = 123,
-  seed_sim = 321,
-  seed_cov = 541
+  seed_sim = 321
 )
 
 arg <- bind_rows(osc_method_arg, osc_random_arg, spacetime_method_arg,
                  spacetime_random_arg)
 
 arg_vector <- sprintf(stringr::str_c("simulate-setting.R --mu %s --epsilon %s ",
-                                     "--n_spatial %d --n_time %d --m %d ",
-                                     "--x_blocks %s --y_blocks %s ",
-                                     "--time_blocks %s --random_eigenvect %s ",
-                                     "--seed_spatial %d --seed_sim %d ",
-                                     "--seed_cov %d"),
+                                     "--ns %d --nt %d --m %d ",
+                                     "--xblocks %s --yblocks %s ",
+                                     "--tblocks %s --random_eigen %s ",
+                                     "--seed_spatial %d --seed_sim %d "),
   arg$mu,
   arg$epsilon,
-  arg$n_spatial,
-  arg$n_time,
+  arg$ns,
+  arg$nt,
   arg$m,
-  arg$x_blocks,
-  arg$y_blocks,
-  arg$time_blocks,
-  arg$random_eigenvect,
+  arg$xblocks,
+  arg$yblocks,
+  arg$tblocks,
+  arg$random_eigen,
   arg$seed_spatial,
-  arg$seed_sim,
-  arg$seed_cov
+  arg$seed_sim
 )
 
 readr::write_lines(arg_vector, "sim-args.txt")

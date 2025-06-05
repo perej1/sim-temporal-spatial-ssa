@@ -65,12 +65,12 @@ gen_coords <- function(n_spatial, n_time, seed) {
 #' time components
 #'
 #' @param coords An sftime object with locations and time but no fields.
-#' @param range,smoothness,aRange,theta The parameters for Matern and
+#' @param range,smoothness,aRange The parameters for Matern and
 #'   Exponential covariance functions.
 #'
 #' @returns A Vector giving value of the field at each spatiotemporal
 #'   coordinate.
-gen_independent_loc_time <- function(coords, range, smoothness, aRange, theta) {
+gen_separable <- function(coords, range, smoothness, aRange) {
   coords_space <- unique(coords$geometry)
   coords_time <- unique(coords$time)
   n_space <- length(coords_space)
@@ -91,59 +91,14 @@ gen_independent_loc_time <- function(coords, range, smoothness, aRange, theta) {
   for (i in 1:n_time) {
     for (j in i:n_time) {
       dist_time <- abs(coords_time[i] - coords_time[j])
-      covmat_time[i, j] <- fields::Exponential(dist_time,
-                                               aRange = aRange,
-                                               theta = theta)
+      covmat_time[i, j] <- fields::Exponential(dist_time, aRange = aRange)
     }
   }
   covmat_time <- covmat_time + t(covmat_time) - diag(n_time)
 
   data_spatial <- as.vector(mvtnorm::rmvnorm(n = 1, sigma = covmat_space))
   data_time <- as.vector(mvtnorm::rmvnorm(n = 1, sigma = covmat_time))
-  rep(data_spatial, times = n_time) + rep(data_time, each = n_space)
-}
-
-
-#' Create a covariance matrix corresponding to the spatiotemporal locations
-#'
-#' The chosen covariance function is separable. For spatial dependence structure
-#' we use the Matern covariance function. For the temporal dependence structure
-#' we use the exponential covariance function.
-#'
-#' @param coords An sftime object with locations and time but no fields.
-#' @param range,smoothness,aRange,theta Parameters for Matern and Exponential
-#'   covariance functions.
-#'
-#' @returns A Covariance matrix corresponding to spatiotemporal locations.
-gen_cov_separable <- function(coords, range, smoothness, aRange, theta) {
-  coords_space <- unique(coords$geometry)
-  coords_time <- unique(coords$time)
-  n_space <- length(coords_space)
-  n_time <- length(coords_time)
-
-  covmat_space <- matrix(rep(0, n_space^2), nrow = n_space)
-  for (i in 1:n_space) {
-    for (j in i:n_space) {
-      dist_space <- as.double(sf::st_distance(coords_space[[i]],
-                                              coords_space[[j]]))
-      covmat_space[i, j] <- fields::Matern(dist_space, range = range,
-                                           smoothness = smoothness)
-    }
-  }
-  covmat_space <- covmat_space + t(covmat_space) - diag(n_space)
-
-  covmat_time <- matrix(rep(0, n_time^2), nrow = n_time)
-  for (i in 1:n_time) {
-    for (j in i:n_time) {
-      dist_time <- abs(coords_time[i] - coords_time[j])
-      covmat_time[i, j] <- fields::Exponential(dist_time,
-                                               aRange = aRange,
-                                               theta = theta)
-    }
-  }
-  covmat_time <- covmat_time + t(covmat_time) - diag(n_time)
-
-  covmat_time %x% covmat_space
+  rep(data_spatial, times = n_time) * rep(data_time, each = n_space)
 }
 
 
@@ -175,41 +130,6 @@ compute_segments <- function(coords, x_prop, y_prop, time_prop) {
            time_segment = cut(time, time_cuts, include.lowest = TRUE)) %>%
     sftime::st_drop_time() %>%
     sf::st_drop_geometry()
-}
-
-
-#' Simulate field with separable covariance structure in segments
-#'
-#' @param coords An sftime object with locations and time but no fields.
-#' @param x_prop,y_prop,time_prop Division of the corresponding axis in terms of
-#'   percentages. Percentages are given as a double vector.
-#' @param range,smoothness,Arange,theta Each parameter is a vector has length
-#'   equal to the number of segments. These are parameters for Matern and
-#'   Exponential covariance functions for each segment.
-#'
-#' @returns A Vector giving value of the field at each spatiotemporal
-#'   coordinate.
-gen_separable_blocks <- function(coords, x_prop, y_prop, time_prop, range,
-                                 smoothness, aRange, theta) {
-  segments <- compute_segments(coords, x_prop, y_prop, time_prop) %>%
-    mutate(comb = interaction(x_segment, y_segment, time_segment)) %>%
-    pull(comb)
-
-  indices <- match(segments, levels(segments))
-
-  coords_filter <- coords %>%
-    mutate(segment = segments, index = indices, value = NA)
-
-  for (i in 1:(length(x_prop) * length(y_prop) * length(time_prop))) {
-    coords_i <- coords_filter %>%
-      filter(index == i) %>%
-      select(geometry, time)
-    covmat <- gen_cov_separable(coords_i, range[i], smoothness[i], aRange[i],
-                                theta[i])
-    coords_filter$value[coords_filter$index == i] <-
-      mvtnorm::rmvnorm(n = 1, sigma = covmat)
-  }
-  coords_filter$value
 }
 
 

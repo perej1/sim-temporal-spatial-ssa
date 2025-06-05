@@ -6,61 +6,60 @@ source("functions.R")
 
 
 option_list <- list(
-  make_option("--mu", type = "character", default = "spacetime",
+  make_option("--mu", type = "character", default = "xyt4",
               help = stringr::str_c("For different options the latent field ",
                                     "has different mean.")),
-  make_option("--epsilon", type = "character", default = "no_dep",
+  make_option("--epsilon", type = "character", default = "sephigh",
               help = stringr::str_c("For different options the latent field ",
                                     "has different dependence structure")),
-  make_option("--n_spatial", type = "integer", default = 50,
+  make_option("--ns", type = "integer", default = 50,
               help = "Number of spatial locations at each time point"),
-  make_option("--n_time", type = "integer", default = 100,
+  make_option("--nt", type = "integer", default = 100,
               help = "number of time points, indexing starts from 0"),
   make_option("--m", type = "integer", default = 100,
               help = "Number of repetitions per scenario"),
-  make_option("--x_blocks", type = "character", default = "100",
+  make_option("--xblocks", type = "character", default = "100",
               help = stringr::str_c("Segmentation of x coord, string gives ",
                                     "proportions of the segment lengths")),
-  make_option("--y_blocks", type = "character", default = "100",
+  make_option("--yblocks", type = "character", default = "100",
               help = stringr::str_c("Segmentation of y coord, string gives ",
                                     "proportions of the segment lengths")),
-  make_option("--time_blocks", type = "character", default = "100",
+  make_option("--tblocks", type = "character", default = "100",
               help = stringr::str_c("Segmentation of time, string gives ",
                                     "proportions of the segment lengths")),
-  make_option("--random_eigenvect", type = "logical", default = TRUE,
+  make_option("--random_eigen", type = "logical", default = FALSE,
               help = stringr::str_c("If TRUE random eigenvectors are used in ",
                                     "the computation of the unmixing matrix")),
   make_option("--seed_spatial", type = "integer", default = 123,
               help = "Seed for generating spatial locations"),
   make_option("--seed_sim", type = "integer", default = 321,
-              help = "Seed for the function 'simulate'"),
-  make_option("--seed_cov", type = "integer", default = 541,
-              help = "Seed for the params of cov functions")
+              help = "Seed for the function 'simulate'")
 )
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 
 # Set number of components, and parameters for covariance functions
-if (opt$mu == "oscillating") {
+if (opt$mu %in% c("osc", "xyt2")) {
   dim <- 4
   dim_nonstationary <- 2
-} else if (opt$mu == "spacetime") {
+} else if (opt$mu == "xyt3") {
+  dim <- 6
+  dim_nonstationary <- 3
+} else if (opt$mu == "xyt4") {
   dim <- 8
   dim_nonstationary <- 4
+} else {
+  rlang::abort("Invalid option for the argument --mu.")
 }
 
-set.seed(opt$seed_cov)
-if (opt$epsilon == "loc_time_ind") {
-  range <- stats::runif(dim, 0.5, 1)
-  smoothness <- stats::runif(dim, 0.5, 1)
-  aRange <- stats::runif(dim, 0.5, 1)
-  theta <- stats::runif(dim, 0.5, 1)
-} else if (opt$epsilon == "separable_blocks") {
-  num <- 40 # Comes from segmentation in the option epsilon=="separable_blocks"
-  range <- stats::runif(dim * num, 0.5, 1)
-  smoothness <- stats::runif(dim * num, 0.5, 1)
-  aRange <- stats::runif(dim * num, 0.5, 1)
-  theta <- stats::runif(dim * num, 0.5, 1)
+if (opt$epsilon == "seplow") {
+  aRange <- 0.5
+  range <- 0.1
+  smoothness <- 0.5
+} else if (opt$epsilon == "sephigh") {
+  aRange <- 2
+  range <- 1
+  smoothness <- 0.5
 }
 
 #' Perform ith repetition for a particular setting
@@ -81,37 +80,56 @@ simulate <- function(i, coords) {
   }
 
   # Set latent components
-  if (opt$epsilon == "no_dep") {
+  if (opt$epsilon == "noise") {
     epsilon <- 1:dim %>%
-      purrr::map(\(i) stats::rnorm(opt$n_spatial * opt$n_time))
-  } else if (opt$epsilon == "loc_time_ind") {
+      purrr::map(\(i) stats::rnorm(opt$ns * opt$nt))
+  } else if (opt$epsilon %in% c("seplow", "sephigh")) {
     epsilon <- 1:dim %>%
-      purrr::map(\(i) gen_independent_loc_time(coords, range[i], smoothness[i],
-                                               aRange[i], theta[i]))
-  } else if (opt$epsilon == "separable_blocks") {
-    epsilon <- 1:dim %>%
-      purrr::map(\(i) gen_separable_blocks(
-        coords,
-        c(50, 50),
-        c(50, 50),
-        rep(10, 10),
-        range[((i - 1) * num + 1):(i * num)],
-        smoothness[((i - 1) * num + 1):(i * num)],
-        aRange[((i - 1) * num + 1):(i * num)],
-        theta[((i - 1) * num + 1):(i * num)]
-      ))
+      purrr::map(\(i) gen_separable(coords, range, smoothness, aRange))
   } else {
     rlang::abort("Invalid option for the argument --epsilon.")
   }
 
-  if (opt$mu == "spacetime") {
-    f1 <- gen_field_cluster(coords, epsilon[[1]], c(0.5, 0.7), 100, c(50, 50),
+  if (opt$mu == "xyt2") {
+    f1 <- gen_field_cluster(coords, epsilon[[1]], c(0, 0.2), 100, c(50, 50),
                             100)
-    f2 <- gen_field_cluster(coords, epsilon[[2]], c(-0.5, -0.7), 100, 100,
+    f2 <- gen_field_cluster(coords, epsilon[[2]], c(-1, -1.2), 100, 100,
                             c(50, 50))
-    f3 <- gen_field_cluster(coords, epsilon[[3]], c(0, 0.2), c(50, 50), 100,
+    latent <- coords %>%
+      mutate(
+        f1 = f1,
+        f2 = f2,
+        f3 = epsilon[[3]],
+        f4 = epsilon[[4]]
+      ) %>%
+      sftime::st_drop_time() %>%
+      sf::st_drop_geometry()
+  } else if (opt$mu == "xyt3") {
+    f1 <- gen_field_cluster(coords, epsilon[[1]], c(0, 0.2), 100, c(50, 50),
                             100)
-    f4 <- gen_field_cluster(coords, epsilon[[4]], seq(0, 0.2, length.out = 8),
+    f2 <- gen_field_cluster(coords, epsilon[[2]], c(-1, -1.2), 100, 100,
+                            c(50, 50))
+    f3 <- gen_field_cluster(coords, epsilon[[3]], c(2, 2.2), c(50, 50), 100,
+                            100)
+    latent <- coords %>%
+      mutate(
+        f1 = f1,
+        f2 = f2,
+        f3 = f3,
+        f4 = epsilon[[4]],
+        f5 = epsilon[[5]],
+        f6 = epsilon[[6]]
+      ) %>%
+      sftime::st_drop_time() %>%
+      sf::st_drop_geometry()
+  } else if (opt$mu == "xyt4") {
+    f1 <- gen_field_cluster(coords, epsilon[[1]], c(0, 0.2), 100, c(50, 50),
+                            100)
+    f2 <- gen_field_cluster(coords, epsilon[[2]], c(-1, -1.2), 100, 100,
+                            c(50, 50))
+    f3 <- gen_field_cluster(coords, epsilon[[3]], c(2, 2.2), c(50, 50), 100,
+                            100)
+    f4 <- gen_field_cluster(coords, epsilon[[4]], seq(-2, -2.2, length.out = 8),
                             c(50, 50), c(50, 50), c(50, 50))
     latent <- coords %>%
       mutate(
@@ -126,7 +144,7 @@ simulate <- function(i, coords) {
       ) %>%
       sftime::st_drop_time() %>%
       sf::st_drop_geometry()
-  } else if (opt$mu == "oscillating") {
+  } else if (opt$mu == "osc") {
     f1 <- gen_field_cluster(coords, epsilon[[1]], c(5, 5, -5, -5, 5, 5, -5, -5),
                             c(50, 50), c(50, 50), c(50, 50))
     f2 <- gen_field_cluster(coords, epsilon[[2]], c(5, -5, 5, -5, 5, -5, 5, -5),
@@ -161,11 +179,11 @@ simulate <- function(i, coords) {
   colnames(whitened) <- stringr::str_c("f", 1:dim)
 
   # Parse cut points
-  x_prop <- stringr::str_split(opt$x_blocks, ":", simplify = TRUE) %>%
+  x_prop <- stringr::str_split(opt$xblocks, ":", simplify = TRUE) %>%
     as.integer()
-  y_prop <- stringr::str_split(opt$y_blocks, ":", simplify = TRUE) %>%
+  y_prop <- stringr::str_split(opt$yblocks, ":", simplify = TRUE) %>%
     as.integer()
-  time_prop <- stringr::str_split(opt$time_blocks, ":", simplify = TRUE) %>%
+  time_prop <- stringr::str_split(opt$tblocks, ":", simplify = TRUE) %>%
     as.integer()
 
   whitened_with_seg <- compute_segments(coords, x_prop, y_prop, time_prop) %>%
@@ -175,7 +193,7 @@ simulate <- function(i, coords) {
   # Compute means and proportional sample sizes in segments
   means_segment <- whitened_with_seg %>%
     summarise(across(starts_with("f"), ~ mean(.x)), .groups = "drop") %>%
-    mutate(n_prop = group_size(whitened_with_seg) / (opt$n_spat * opt$n_time))
+    mutate(n_prop = group_size(whitened_with_seg) / (opt$ns * opt$nt))
 
   # Compute variance of the segment means
   outer_prods <- means_segment %>%
@@ -188,7 +206,7 @@ simulate <- function(i, coords) {
     purrr::reduce(`+`)
 
   # Compute unmixing matrix
-  if (opt$random_eigenvect) {
+  if (opt$random_eigen) {
     v_transpose <- pracma::randortho(dim, type = "orthonormal")
   } else {
     v_transpose <- t(eigen(mean_var)$vectors)
@@ -219,7 +237,7 @@ simulate <- function(i, coords) {
 }
 
 # Set spatiotemporal coordinates
-coords <- gen_coords(opt$n_spatial, opt$n_time, opt$seed_spatial)
+coords <- gen_coords(opt$ns, opt$nt, opt$seed_spatial)
 
 # Perform m repetitions for the scenario
 RNGkind("L'Ecuyer-CMRG")
@@ -237,13 +255,13 @@ colnames(eigenval) <- stringr::str_c("f", 1:dim)
 # Save results
 filename <- stringr::str_c("mu_", opt$mu,
                            "_epsilon_", opt$epsilon,
-                           "_n_spatial_", opt$n_spatial,
-                           "_n_time_", opt$n_time,
+                           "_ns_", opt$ns,
+                           "_nt_", opt$nt,
                            "_m_", opt$m,
-                           "_x_blocks_", opt$x_blocks,
-                           "_y_blocks_", opt$y_blocks,
-                           "_time_blocks_", opt$time_blocks,
-                           "_random_eigenvect_", opt$random_eigenvect, ".csv")
+                           "_xblocks_", opt$xblocks,
+                           "_yblocks_", opt$yblocks,
+                           "_tblocks_", opt$tblocks,
+                           "_random_eigen_", opt$random_eigen, ".csv")
 
 tibble::as_tibble(performance) %>%
   readr::write_csv(stringr::str_c("results/perf/", filename))

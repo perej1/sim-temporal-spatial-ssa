@@ -1,5 +1,5 @@
 #!/bin/bash
 
-Rscript plot-boxplots.R --epsilon no_dep
-Rscript plot-boxplots.R --epsilon loc_time_ind
-Rscript plot-boxplots.R --epsilon separable_blocks
+Rscript plot-boxplots.R --epsilon noise
+Rscript plot-boxplots.R --epsilon seplow 
+Rscript plot-boxplots.R --epsilon sephigh
