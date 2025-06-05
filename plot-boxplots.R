@@ -184,7 +184,7 @@ osc_plot <- osc_data %>%
                "nonstationary_median" = "Nonstationary")
   ) +
   guides(linetype = guide_legend(override.aes = list(linewidth = 0.6)))
-ggsave(stringr::str_c("plots/","osc_", opt$epsilon, ".pdf"), osc_plot,
+ggsave(stringr::str_c("plots/", "osc_", opt$epsilon, ".pdf"), osc_plot,
        dpi = 1000)
 
 xyt2_plot <- xyt2_data %>%
@@ -231,7 +231,7 @@ xyt2_plot <- xyt2_data %>%
                "nonstationary_median" = "Nonstationary")
   ) +
   guides(linetype = guide_legend(override.aes = list(linewidth = 0.6)))
-ggsave(stringr::str_c("plots/","xyt2_", opt$epsilon, ".pdf"), xyt2_plot,
+ggsave(stringr::str_c("plots/", "xyt2_", opt$epsilon, ".pdf"), xyt2_plot,
        dpi = 1000)
 
 xyt3_plot <- xyt3_data %>%
@@ -278,7 +278,7 @@ xyt3_plot <- xyt3_data %>%
                "nonstationary_median" = "Nonstationary")
   ) +
   guides(linetype = guide_legend(override.aes = list(linewidth = 0.6)))
-ggsave(stringr::str_c("plots/","xyt3_", opt$epsilon, ".pdf"), xyt3_plot,
+ggsave(stringr::str_c("plots/", "xyt3_", opt$epsilon, ".pdf"), xyt3_plot,
        dpi = 1000)
 
 xyt4_plot <- xyt4_data %>%
@@ -325,5 +325,5 @@ xyt4_plot <- xyt4_data %>%
                "nonstationary_median" = "Nonstationary")
   ) +
   guides(linetype = guide_legend(override.aes = list(linewidth = 0.6)))
-ggsave(stringr::str_c("plots/","xyt4_", opt$epsilon, ".pdf"), xyt4_plot,
+ggsave(stringr::str_c("plots/", "xyt4_", opt$epsilon, ".pdf"), xyt4_plot,
        dpi = 1000)
