@@ -27,8 +27,8 @@ Below, the purpose of each script is explained:
 - `compute-stats.R` - Compute 1st, 2nd and 3rd quartiles of the performance
   measure for different simulation scenarios
 - `plot-boxplots.R` - Summarise results by plotting boxplots for a certain
-  dependence structure.
-- `plot-batch.sh` - Plot boxplots for corresponding to all dependence strucures.
+  dependence structure
+- `plot-batch.sh` - Plot boxplots corresponding to all dependence structures
 - `test-gen_field_cluster.R` - Unit test for the function `gen_field_cluster()`
 
 Generate arguments by
@@ -50,11 +50,16 @@ directory of the project)
 ```
 bash sim-batch.sh
 ```
-Simulation results corresponding to each scenario are saved in the directory
-`results/`.
+Simulation results corresponding to each scenario are saved in the directories
+`results/perf` and `results/eigen`.
 
-
-For plotting, create the directory `plots/`. Then, plots can be produced with
+Before plotting run
+```
+Rscript compute-stats.R
+```
+Now files `perf-quantiles.csv` and `lambda-avg-xyt[i].csv` for i=1,2,3
+summarizing results are generated. For plotting, create the directory `plots/`.
+Then, plots can be produced with
 ```
 bash plot-batch.sh
 ```
