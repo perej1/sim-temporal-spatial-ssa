@@ -34,7 +34,7 @@ medians_random_xyt4 <- medians_random %>%
 # Extract desired scenarios for plotting
 args <- readr::read_csv("sim-args.csv", col_types = "ffiiiffflii")
 
-seg_labels_osc <- c("thirds" = "A1", "yconstant" = "A2", "xconstant" = "A3")
+seg_labels_osc <- c("thirds" = "S5", "yconstant" = "S2", "xconstant" = "S1")
 osc_data <- args %>%
   filter(mu == "osc", epsilon == opt$epsilon, random_eigen == FALSE) %>%
   {
@@ -58,9 +58,9 @@ osc_data <- args %>%
   tibble::add_column(segmentation = rep(seg_labels_osc, each = 100)) %>%
   tidyr::pivot_longer(cols = !segmentation, names_to = "type")
 
-seg_labels_xyt <- c("xconstant" = "B1", "yconstant" = "B2", "tconstant" = "B3",
-                    "halfs" = "B4", "thirds" = "B5", "quarters" = "B6",
-                    "tenths" = "B7")
+seg_labels_xyt <- c("xconstant" = "S1", "yconstant" = "S2", "tconstant" = "S3",
+                    "halfs" = "S4", "thirds" = "S5", "quarters" = "S6",
+                    "tenths" = "S7")
 xyt2_data <- args %>%
   filter(mu == "xyt2", epsilon == opt$epsilon,
          random_eigen == FALSE) %>%
