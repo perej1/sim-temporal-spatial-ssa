@@ -85,7 +85,7 @@ for (i in seq_len(nrow(args))) {
 
   # Compute componentwise average eigenvalue
   path <- "results/eigen/"
-  if (arg$mu == "oscillating") {
+  if (arg$mu == "osc") {
     lambda_avg_osc[i, ] <- readr::read_csv(stringr::str_c(path, filename),
                                            col_types = "dddd") %>%
       colMeans() %>%
