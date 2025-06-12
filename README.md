@@ -57,9 +57,18 @@ Before plotting run
 ```
 Rscript compute-stats.R
 ```
-Now files `perf-quantiles.csv` and `lambda-avg-xyt[i].csv` for i=1,2,3
+Now files `perf-quantiles.csv` and `lambda-avg-xyt[i].csv` for $i\in\{1,2,3\}$
 summarizing results are generated. For plotting, create the directory `plots/`.
 Then, plots can be produced with
 ```
 bash plot-batch.sh
 ```
+
+## Boxplots
+
+In directory `plots/` boxplots corresponding to each simulation setting are
+given. Boxplots are computed from $m = 100$ performance measures for the
+stationary or nonstationary part when the stSSA with Segmentation S1-S7 is used.
+Dashed lines correspond to the median of $m = 100$ performance measures when the
+baseline method is used. For details about the simulation settings, see the
+article.

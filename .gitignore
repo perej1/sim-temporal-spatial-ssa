@@ -10,4 +10,5 @@ results/eigen/*
 results/perf/*
 sim-args.*
 analyse-medians.R
+plot-scree.R
 
